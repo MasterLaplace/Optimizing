@@ -414,7 +414,7 @@ private:
     size_t objCount = 0;
 };
 
-#if RUN_TEST 1
+#ifdef RUN_TEST
 int main(void)
 {
     TestDynamicOctree test;
