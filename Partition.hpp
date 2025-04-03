@@ -1,27 +1,24 @@
 #pragma once
 
-#include <SFML/Graphics.hpp>
-#include <unordered_map>
-#include <limits>
-#include <thread>
-#include <mutex>
-#include <future>
-#include <queue>
 #include "DynamicOctree.hpp"
+#include <SFML/Graphics.hpp>
+#include <future>
+#include <limits>
+#include <mutex>
+#include <queue>
+#include <thread>
+#include <unordered_map>
 
 namespace std {
-    template <>
-    struct hash<sf::Vector2i>
+template <> struct hash<sf::Vector2i> {
+    std::size_t operator()(const sf::Vector2i &v) const noexcept
     {
-        std::size_t operator()(const sf::Vector2i& v) const noexcept
-        {
-            return std::hash<int>()(v.x) ^ (std::hash<int>()(v.y) << 1);
-        }
-    };
-}
+        return std::hash<int>()(v.x) ^ (std::hash<int>()(v.y) << 1);
+    }
+};
+} // namespace std
 
-class ThreadPool
-{
+class ThreadPool {
 public:
     ThreadPool(size_t threads) : stop(false)
     {
@@ -44,11 +41,12 @@ public:
     }
 
     template <class F, class... Args>
-    auto enqueue(F &&f, Args &&... args) -> std::future<typename std::result_of<F(Args...)>::type>
+    auto enqueue(F &&f, Args &&...args) -> std::future<typename std::result_of<F(Args...)>::type>
     {
         using return_type = typename std::result_of<F(Args...)>::type;
 
-        auto task = std::make_shared<std::packaged_task<return_type()>>(std::bind(std::forward<F>(f), std::forward<Args>(args)...));
+        auto task = std::make_shared<std::packaged_task<return_type()>>(
+            std::bind(std::forward<F>(f), std::forward<Args>(args)...));
 
         std::future<return_type> res = task->get_future();
         {
@@ -83,11 +81,12 @@ private:
     bool stop;
 };
 
-class Partition
-{
+class Partition {
 public:
     Partition(const sf::Vector3f &pos, const sf::Vector3f &size)
-        : _pos(pos), _size(size), _octree(BoundaryBox(pos, size), MAX_CAPACITY, MAX_DEPTH) {}
+        : _pos(pos), _size(size), _octree(BoundaryBox(pos, size), MAX_CAPACITY, MAX_DEPTH)
+    {
+    }
 
     void load_data()
     {
@@ -156,13 +155,9 @@ private:
     bool _loaded = false;
 };
 
-class WorldPartition
-{
+class WorldPartition {
 public:
-    WorldPartition()
-        : _threadPool(std::thread::hardware_concurrency()) // Initialiser le pool de threads avec le nombre de threads disponibles
-    {
-    }
+    WorldPartition() : _threadPool(std::thread::hardware_concurrency()) {}
 
     void load_partition(sf::Vector2i grid)
     {
@@ -187,7 +182,8 @@ public:
 
     void update(sf::RectangleShape player_rect)
     {
-        sf::Vector2i player_grid = {static_cast<int>(player_rect.getPosition().x / _size.x), static_cast<int>(player_rect.getPosition().y / _size.y)};
+        sf::Vector2i player_grid = {static_cast<int>(player_rect.getPosition().x / _size.x),
+                                    static_cast<int>(player_rect.getPosition().y / _size.y)};
 
         for (int x = player_grid.x - 1; x <= player_grid.x + 1; ++x)
         {

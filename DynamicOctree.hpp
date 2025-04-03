@@ -1,16 +1,16 @@
 #pragma once
 
-#include <iostream>
-#include <vector>
+#include <SFML/Graphics.hpp>
+#include <algorithm>
 #include <array>
-#include <list>
+#include <chrono>
 #include <cmath>
+#include <fstream>
+#include <iostream>
+#include <list>
 #include <memory>
 #include <random>
-#include <chrono>
-#include <fstream>
-#include <algorithm>
-#include <SFML/Graphics.hpp>
+#include <vector>
 
 class BoundaryBox {
 public:
@@ -22,44 +22,41 @@ public:
 
     BoundaryBox(float x, float y, float z, float w, float h, float d) noexcept
         : _min(x, y, z), _max(x + w, y + h, z + d)
-        {
-            _min.x = std::min(_min.x, _max.x);
-            _min.y = std::min(_min.y, _max.y);
-            _min.z = std::min(_min.z, _max.z);
-            _max.x = std::max(_min.x, _max.x);
-            _max.y = std::max(_min.y, _max.y);
-            _max.z = std::max(_min.z, _max.z);
-        }
+    {
+        _min.x = std::min(_min.x, _max.x);
+        _min.y = std::min(_min.y, _max.y);
+        _min.z = std::min(_min.z, _max.z);
+        _max.x = std::max(_min.x, _max.x);
+        _max.y = std::max(_min.y, _max.y);
+        _max.z = std::max(_min.z, _max.z);
+    }
 
     BoundaryBox(const sf::Vector3f &pos, const sf::Vector3f &size) noexcept
         : _min(pos), _max(pos.x + size.x, pos.y + size.y, pos.z + size.z)
-        {
-            _min.x = std::min(_min.x, _max.x);
-            _min.y = std::min(_min.y, _max.y);
-            _min.z = std::min(_min.z, _max.z);
-            _max.x = std::max(_min.x, _max.x);
-            _max.y = std::max(_min.y, _max.y);
-            _max.z = std::max(_min.z, _max.z);
-        }
+    {
+        _min.x = std::min(_min.x, _max.x);
+        _min.y = std::min(_min.y, _max.y);
+        _min.z = std::min(_min.z, _max.z);
+        _max.x = std::max(_min.x, _max.x);
+        _max.y = std::max(_min.y, _max.y);
+        _max.z = std::max(_min.z, _max.z);
+    }
 
     ~BoundaryBox() = default;
 
     [[nodiscard]] inline bool contains(const sf::Vector3f &point) const noexcept
     {
-        return (point.x >= _min.x && point.x <= _max.x &&
-                point.y >= _min.y && point.y <= _max.y &&
-                point.z >= _min.z && point.z <= _max.z);
+        return (point.x >= _min.x && point.x <= _max.x && point.y >= _min.y && point.y <= _max.y && point.z >= _min.z &&
+                point.z <= _max.z);
     }
     [[nodiscard]] inline bool overlaps(const BoundaryBox &other) const noexcept
     {
-        return (_min.x <= other._max.x && _max.x >= other._min.x &&
-                _min.y <= other._max.y && _max.y >= other._min.y &&
+        return (_min.x <= other._max.x && _max.x >= other._min.x && _min.y <= other._max.y && _max.y >= other._min.y &&
                 _min.z <= other._max.z && _max.z >= other._min.z);
     }
     [[nodiscard]] inline bool contains(const BoundaryBox &other) const noexcept
     {
-        return (_min.x <= other._min.x && _max.x >= other._max.x &&
-                _min.y <= other._min.y && _max.y >= other._max.y &&
+        return (_min.x <= other._min.x && _max.x >= other._max.x && _min.y <= other._min.y && _max.y >= other._max.y &&
                 _min.z <= other._min.z && _max.z >= other._max.z);
     }
 
@@ -78,17 +75,14 @@ protected:
     sf::Vector3f _max{1, 1, 1};
 };
 
-struct SomeObjectWithArea
-{
+struct SomeObjectWithArea {
     sf::Vector3f vPos;
     sf::Vector3f vVel;
     sf::Vector3f vSize;
     sf::Color colour;
 };
 
-template <typename T>
-struct TreeItemLocation
-{
+template <typename T> struct TreeItemLocation {
     typename std::list<std::pair<BoundaryBox, T>> *container;
     typename std::list<std::pair<BoundaryBox, T>>::iterator iterator;
 };
@@ -96,12 +90,9 @@ struct TreeItemLocation
 constexpr uint8_t MAX_DEPTH = 5;
 constexpr uint8_t MAX_CAPACITY = 4;
 
-template <typename OBJ_TYPE>
-class DynamicOctree
-{
+template <typename OBJ_TYPE> class DynamicOctree {
 private:
-    enum class INDEX : uint8_t
-    {
+    enum class INDEX : uint8_t {
         SWD, // South-West-Down (min corner)
         SED, // South-East-Down
         NWD, // North-West-Down
@@ -120,7 +111,7 @@ public:
         resize(boundary);
     }
 
-     //* COMPLETED
+    //* COMPLETED
     void resize(const BoundaryBox &rArea)
     {
         clear();
@@ -228,15 +219,13 @@ public:
     }
 
     //* COMPLETED
-    const BoundaryBox &area() const
-    {
-        return _boundary;
-    }
+    const BoundaryBox &area() const { return _boundary; }
 
     //* COMPLETED
     bool remove(OBJ_TYPE pItem)
     {
-        auto it = std::find_if(_pItems.begin(), _pItems.end(), [pItem](const std::pair<BoundaryBox, OBJ_TYPE> &p) { return p.second == pItem; });
+        auto it = std::find_if(_pItems.begin(), _pItems.end(),
+                               [pItem](const std::pair<BoundaryBox, OBJ_TYPE> &p) { return p.second == pItem; });
 
         if (it != _pItems.end())
         {
@@ -266,36 +255,26 @@ protected:
     std::list<std::pair<BoundaryBox, OBJ_TYPE>> _pItems;
 };
 
-template <typename T>
-struct TreeItem
-{
+template <typename T> struct TreeItem {
     T item;
     TreeItemLocation<typename std::list<TreeItem<T>>::iterator> pItem;
 };
 
-template <typename BOUNDARY_TYPE, typename OBJ_TYPE>
-class DynamicOctreeContainer
-{
+template <typename BOUNDARY_TYPE, typename OBJ_TYPE> class DynamicOctreeContainer {
 public:
     using TreeContainer = std::list<TreeItem<OBJ_TYPE>>;
 
-    DynamicOctreeContainer(const BOUNDARY_TYPE &size, const uint8_t capacity = MAX_CAPACITY, const uint8_t depth = MAX_DEPTH)
-        : _root(size, capacity, depth) {}
-
-    void resize(const BOUNDARY_TYPE &rArea)
+    DynamicOctreeContainer(const BOUNDARY_TYPE &size, const uint8_t capacity = MAX_CAPACITY,
+                           const uint8_t depth = MAX_DEPTH)
+        : _root(size, capacity, depth)
     {
-        _root.resize(rArea);
     }
 
-    size_t size() const
-    {
-        return _allItems.size();
-    }
+    void resize(const BOUNDARY_TYPE &rArea) { _root.resize(rArea); }
 
-    bool empty() const
-    {
-        return _allItems.empty();
-    }
+    size_t size() const { return _allItems.size(); }
+
+    bool empty() const { return _allItems.empty(); }
 
     void clear()
     {
@@ -303,25 +282,13 @@ public:
         _allItems.clear();
     }
 
-    typename TreeContainer::iterator begin()
-    {
-        return _allItems.begin();
-    }
+    typename TreeContainer::iterator begin() { return _allItems.begin(); }
 
-    typename TreeContainer::iterator end()
-    {
-        return _allItems.end();
-    }
+    typename TreeContainer::iterator end() { return _allItems.end(); }
 
-    typename TreeContainer::const_iterator cbegin() const
-    {
-        return _allItems.cbegin();
-    }
+    typename TreeContainer::const_iterator cbegin() const { return _allItems.cbegin(); }
 
-    typename TreeContainer::const_iterator cend() const
-    {
-        return _allItems.cend();
-    }
+    typename TreeContainer::const_iterator cend() const { return _allItems.cend(); }
 
     void insert(const OBJ_TYPE &item, const BOUNDARY_TYPE &itemsize)
     {
@@ -355,8 +322,7 @@ protected:
     DynamicOctree<typename TreeContainer::iterator> _root;
 };
 
-class TestDynamicOctree
-{
+class TestDynamicOctree {
 public:
     TestDynamicOctree(size_t nbObjects = 1000, float maxArea = 100.0f)
         : _octree(BoundaryBox(0, 0, 0, maxArea, maxArea, maxArea), MAX_CAPACITY, MAX_DEPTH)
