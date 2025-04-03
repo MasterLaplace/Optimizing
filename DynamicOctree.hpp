@@ -331,9 +331,9 @@ public:
         _allItems.back().pItem = _root.insert(std::prev(_allItems.end()), itemsize);
     }
 
-    std::vector<typename TreeContainer::iterator> search(const BOUNDARY_TYPE &rArea) const
+    std::list<typename TreeContainer::iterator> search(const BOUNDARY_TYPE &rArea) const
     {
-        std::vector<typename TreeContainer::iterator> listItemsPointers;
+        std::list<typename TreeContainer::iterator> listItemsPointers;
         _root.search(rArea, listItemsPointers);
         return listItemsPointers;
     }

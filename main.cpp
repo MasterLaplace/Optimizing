@@ -34,7 +34,7 @@ int main()
         worldPartition.update(player_rect);
 
         window.clear();
-        worldPartition.draw(window);
+        worldPartition.draw(window, player_rect.getPosition());
         window.draw(player_rect);
         window.display();
     }

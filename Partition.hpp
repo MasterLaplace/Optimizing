@@ -113,17 +113,20 @@ public:
         std::cout << "Cellule " << _pos.x << " " << _pos.y << " chargée." << std::endl;
     }
 
-    void draw(sf::RenderWindow &window) const
+    void draw(sf::RenderWindow &window, const sf::Vector3f &player_pos) const
     {
         if (!_loaded)
             return;
 
-        for (const auto &obj : _objects)
+        sf::Vector3f size{50, 50, std::numeric_limits<float>::max()};
+        BoundaryBox boundaryBox(size * -0.5f + player_pos, size);
+
+        for (const auto &obj : _octree.search(boundaryBox))
         {
             sf::RectangleShape rect;
-            rect.setPosition({obj.vPos.x, obj.vPos.y});
-            rect.setSize({obj.vSize.x, obj.vSize.y});
-            rect.setFillColor(obj.colour);
+            rect.setPosition({obj->item.vPos.x, obj->item.vPos.y});
+            rect.setSize({obj->item.vSize.x, obj->item.vSize.y});
+            rect.setFillColor(obj->item.colour);
             window.draw(rect);
         }
 
@@ -212,12 +215,12 @@ public:
         }
     }
 
-    void draw(sf::RenderWindow &window)
+    void draw(sf::RenderWindow &window, const sf::Vector2f &player_pos)
     {
         std::lock_guard<std::mutex> lock(_mutex);
         for (const auto &cell : _cells)
         {
-            cell.second->draw(window);
+            cell.second->draw(window, {player_pos.x, player_pos.y, 0});
         }
     }
 
