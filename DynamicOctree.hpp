@@ -1,3 +1,36 @@
+/**************************************************************************
+ * Optimizing v0.0.0
+ *
+ * Optimizing is a C/CPP software package, part of the Laplace-Project.
+ * It is designed to provide a set of tools and utilities for optimizing
+ * various aspects of software development, including performance,
+ * memory usage, and code organization.
+ *
+ * This file is part of the Optimizing project that is under Anti-NN License.
+ * https://github.com/MasterLaplace/Anti-NN_LICENSE
+ * Copyright © 2025 by @MasterLaplace, All rights reserved.
+ *
+ * Optimizing is a free software: you can redistribute it and/or modify
+ * it under the terms of the Anti-NN License as published by MasterLaplace.
+ * See the Anti-NN License for more details.
+ *
+ * @file DynamicOctree.hpp
+ * @brief Dynamic Octree Implementation for 3D Spatial Partitioning.
+ *
+ * This file provides a dynamic octree implementation for efficient spatial
+ * partitioning in 3D space. It allows for the insertion, searching, and removal
+ * of objects within a defined 3D boundary. The octree is designed to handle
+ * dynamic objects and can be resized as needed.
+ *
+ * The implementation is based on the work of javidx9, which can be
+ * found in the following tutorial:
+ * - https://www.youtube.com/watch?v=ASAowY6yJII&ab_channel=javidx9
+ *
+ * @author @MasterLaplace
+ * @version 0.0.0
+ * @date 2025-04-03
+ **************************************************************************/
+
 #pragma once
 
 #include <SFML/Graphics.hpp>
@@ -104,14 +137,12 @@ private:
     };
 
 public:
-    //* COMPLETED
     DynamicOctree(const BoundaryBox &boundary, const uint8_t capacity = MAX_CAPACITY, const uint8_t depth = MAX_DEPTH)
         : _boundary(boundary), _DEPTH(depth), _CAPACITY(capacity)
     {
         resize(boundary);
     }
 
-    //* COMPLETED
     void resize(const BoundaryBox &rArea)
     {
         clear();
@@ -130,7 +161,6 @@ public:
         _rNodes[static_cast<size_t>(INDEX::NEU)] = BoundaryBox(pos + size, size);
     }
 
-    //* COMPLETED
     void clear()
     {
         _pItems.clear();
@@ -144,7 +174,6 @@ public:
         }
     }
 
-    //* COMPLETED
     size_t size() const
     {
         size_t size = _pItems.size();
@@ -158,7 +187,6 @@ public:
         return size;
     }
 
-    //* COMPLETED
     TreeItemLocation<OBJ_TYPE> insert(const OBJ_TYPE &item, const BoundaryBox &itemsize)
     {
         for (uint8_t i = 0; i < 8u; ++i)
@@ -218,10 +246,8 @@ public:
         }
     }
 
-    //* COMPLETED
     const BoundaryBox &area() const { return _boundary; }
 
-    //* COMPLETED
     bool remove(OBJ_TYPE pItem)
     {
         auto it = std::find_if(_pItems.begin(), _pItems.end(),

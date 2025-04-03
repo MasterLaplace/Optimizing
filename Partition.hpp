@@ -1,3 +1,27 @@
+/**************************************************************************
+ * Optimizing v0.0.0
+ *
+ * Optimizing is a C/CPP software package, part of the Laplace-Project.
+ * It is designed to provide a set of tools and utilities for optimizing
+ * various aspects of software development, including performance,
+ * memory usage, and code organization.
+ *
+ * This file is part of the Optimizing project that is under Anti-NN License.
+ * https://github.com/MasterLaplace/Anti-NN_LICENSE
+ * Copyright © 2025 by @MasterLaplace, All rights reserved.
+ *
+ * Optimizing is a free software: you can redistribute it and/or modify
+ * it under the terms of the Anti-NN License as published by MasterLaplace.
+ * See the Anti-NN License for more details.
+ *
+ * @file Partition.hpp
+ * @brief 2D World Partitioning and Thread Pool for Dynamic Octree in 3D Space.
+ *
+ * @author @MasterLaplace
+ * @version 0.0.0
+ * @date 2025-04-03
+ **************************************************************************/
+
 #pragma once
 
 #include "DynamicOctree.hpp"
