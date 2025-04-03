@@ -1,12 +1,13 @@
 #include <SFML/Graphics.hpp>
 #include <unordered_map>
+#include <limits>
 #include <thread>
 #include <mutex>
 #include <future>
 #include <vector>
 #include <iostream>
 #include <queue>
-#include "listQuadTree.cpp"
+#include "DynamicOctree.cpp"
 
 namespace std {
     template <>
@@ -85,18 +86,28 @@ private:
 class Partition
 {
 public:
-    Partition(const sf::Vector2f &pos, const sf::Vector2f &size)
-        : _pos(pos), _size(size) {}
+    Partition(const sf::Vector3f &pos, const sf::Vector3f &size)
+        : _pos(pos), _size(size), _octree(BoundaryBox(pos, size), MAX_CAPACITY, MAX_DEPTH) {}
 
     void load_data()
     {
         _loaded = true;
 
-        objects.reserve(1000);
+        size_t nbObjects = 1000;
+        sf::Vector3f maxArea = _pos + _size;
 
-        for (int i = 0; i < 1000; ++i)
+        _objects.reserve(nbObjects);
+
+        for (size_t i = 0; i < nbObjects; ++i)
         {
-            objects.emplace_back(sf::Vector2f(rand() % 1000, rand() % 1000), sf::Vector2f(0, 0), sf::Vector2f(10, 10), sf::Color::White);
+            SomeObjectWithArea obj;
+            obj.vPos = {randfloat(_pos.x, maxArea.x), randfloat(_pos.y, maxArea.y), randfloat(_pos.z, maxArea.z)};
+            obj.vVel = {randfloat(0, 10), randfloat(0, 10), randfloat(0, 10)};
+            obj.vSize = {randfloat(0, 10), randfloat(0, 10), randfloat(0, 10)};
+            obj.colour = sf::Color(rand() % 255, rand() % 255, rand() % 255, 255);
+
+            _objects.emplace_back(obj);
+            _octree.insert(obj, BoundaryBox(obj.vPos, obj.vSize));
         }
 
         std::cout << "Cellule " << _pos.x << " " << _pos.y << " chargée." << std::endl;
@@ -107,18 +118,18 @@ public:
         if (!_loaded)
             return;
 
-        for (const auto &obj : objects)
+        for (const auto &obj : _objects)
         {
             sf::RectangleShape rect;
-            rect.setPosition(obj.vPos);
-            rect.setSize(obj.vSize);
+            rect.setPosition({obj.vPos.x, obj.vPos.y});
+            rect.setSize({obj.vSize.x, obj.vSize.y});
             rect.setFillColor(obj.colour);
             window.draw(rect);
         }
 
         sf::RectangleShape rect;
-        rect.setPosition(_pos);
-        rect.setSize(_size);
+        rect.setPosition({_pos.x, _pos.y});
+        rect.setSize({_size.x, _size.y});
         rect.setFillColor(sf::Color::Transparent);
         rect.setOutlineColor(sf::Color::White);
         rect.setOutlineThickness(1);
@@ -126,10 +137,19 @@ public:
     }
 
 private:
-    sf::Vector2f _pos;
-    sf::Vector2f _size;
-    std::vector<SomeObjectWithArea> objects;
-    DynamicQuadTreeContainer<SomeObjectWithArea> quadtree;
+    [[nodiscard]] static float randfloat(const float min, const float max)
+    {
+        static std::random_device rd;
+        static std::mt19937 gen(rd());
+        std::uniform_real_distribution<float> dis(min, max);
+        return dis(gen);
+    };
+
+private:
+    sf::Vector3f _pos;
+    sf::Vector3f _size;
+    std::vector<SomeObjectWithArea> _objects;
+    DynamicOctreeContainer<BoundaryBox, SomeObjectWithArea> _octree;
     bool _loaded = false;
 };
 
@@ -146,7 +166,7 @@ public:
         std::lock_guard<std::mutex> lock(_mutex);
         if (_cells.find(grid) == _cells.end())
         {
-            _cells[grid] = std::make_shared<Partition>(sf::Vector2f(grid.x * _size.x, grid.y * _size.y), _size);
+            _cells[grid] = std::make_shared<Partition>(sf::Vector3f(grid.x * _size.x, grid.y * _size.y, 0), _size);
             _threadPool.enqueue(&Partition::load_data, _cells[grid]);
             std::cout << "Lancement du chargement de la cellule " << grid.x << ", " << grid.y << std::endl;
         }
@@ -202,7 +222,7 @@ public:
     }
 
 private:
-    sf::Vector2f _size = {255, 255};
+    sf::Vector3f _size = {255, 255, std::numeric_limits<float>::max()};
     std::unordered_map<sf::Vector2i, std::shared_ptr<Partition>> _cells;
     std::mutex _mutex;
     ThreadPool _threadPool;
@@ -249,3 +269,5 @@ int main()
 
     return 0;
 }
+
+// Build : g++ -std=c++20 -o partition partition.cpp -lsfml-graphics -lsfml-window -lsfml-system
