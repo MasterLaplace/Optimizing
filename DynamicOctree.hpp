@@ -413,12 +413,3 @@ private:
     sf::Vector3f pos{0, 0, 0};
     size_t objCount = 0;
 };
-
-#ifdef RUN_TEST
-int main(void)
-{
-    TestDynamicOctree test;
-    test.run();
-    return 0;
-}
-#endif
