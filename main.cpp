@@ -42,4 +42,5 @@ int main()
     return 0;
 }
 
-// Build : g++ -std=c++20 -o partition partition.cpp -lsfml-graphics -lsfml-window -lsfml-system
+// Build : g++ -std=c++20 -o optimizing main.cpp -lsfml-graphics -lsfml-window -lsfml-system
+// Run : ./optimizing
