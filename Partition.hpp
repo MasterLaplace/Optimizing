@@ -33,6 +33,12 @@
 #include <thread>
 #include <unordered_map>
 
+#ifdef DEBUG
+#    define DEBUG_LINE(_) _
+#else
+#    define DEBUG_LINE(_)
+#endif
+
 namespace std {
 template <> struct hash<sf::Vector2i> {
     std::size_t operator()(const sf::Vector2i &v) const noexcept
@@ -136,7 +142,7 @@ public:
         std::cout << "Cellule " << _pos.x << " " << _pos.y << " chargée." << std::endl;
     }
 
-    void draw(sf::RenderWindow &window, const sf::Vector3f &player_pos) const
+    void draw(sf::RenderWindow &window, const sf::Vector3f &player_pos)
     {
         if (!_loaded)
             return;
@@ -144,6 +150,7 @@ public:
         sf::Vector3f size{50, 50, std::numeric_limits<float>::max()};
         BoundaryBox boundaryBox(size * -0.5f + player_pos, size);
 
+        DEBUG_LINE(auto start = std::chrono::high_resolution_clock::now());
         for (const auto &obj : _octree.search(boundaryBox))
         {
             sf::RectangleShape rect;
@@ -151,6 +158,7 @@ public:
             rect.setSize({obj->item.vSize.x, obj->item.vSize.y});
             rect.setFillColor(obj->item.colour);
             window.draw(rect);
+            DEBUG_LINE(++_objCount);
         }
 
         sf::RectangleShape rect;
@@ -160,6 +168,19 @@ public:
         rect.setOutlineColor(sf::Color::White);
         rect.setOutlineThickness(1);
         window.draw(rect);
+
+#ifdef DEBUG
+        std::chrono::duration<float> duration = std::chrono::high_resolution_clock::now() - start;
+
+        // Log to file if duration exceeds threshold of 0.1 seconds
+        if (duration.count() > 0.1f)
+        {
+            std::ofstream logFile("DebugDynamicOctree.log", std::ios_base::app);
+            logFile << "OctTree: " << _objCount << " objects displayed in " << duration.count() << " seconds\n";
+        }
+
+        _objCount = 0;
+#endif
     }
 
 private:
@@ -176,6 +197,7 @@ private:
     sf::Vector3f _size;
     std::vector<SomeObjectWithArea> _objects;
     DynamicOctreeContainer<BoundaryBox, SomeObjectWithArea> _octree;
+    DEBUG_LINE(size_t _objCount = 0);
     bool _loaded = false;
 };
 
