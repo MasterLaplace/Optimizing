@@ -131,6 +131,19 @@ public:
 #endif
     }
 
+    void getObjects(std::vector<SpatialObject> &objects)
+    {
+        if (!_loaded)
+            return;
+
+        objects.reserve(objects.size() + _objects.size());
+        objects.insert(objects.end(), _objects.begin(), _objects.end());
+    }
+
+    [[nodiscard]] inline const glm::vec3 &getPosition() const noexcept { return _pos; }
+    [[nodiscard]] inline const glm::vec3 &getSize() const noexcept { return _size; }
+    [[nodiscard]] inline bool isLoaded() const noexcept { return _loaded; }
+
 private:
     glm::vec3 _pos;
     glm::vec3 _size;
@@ -200,6 +213,14 @@ public:
         {
             cell.second->draw(window, {player_pos.x, player_pos.y, 0});
         }
+    }
+
+    inline void getAllObects(std::vector<SpatialObject> &objects)
+    {
+        std::lock_guard<std::mutex> lock(_mutex);
+
+        for (const auto &cell : _cells)
+            cell.second->getObjects(objects);
     }
 
 private:
