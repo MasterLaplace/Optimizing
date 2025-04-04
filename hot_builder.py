@@ -4,6 +4,7 @@ import os
 import time
 import subprocess
 import sys
+import select
 
 # Function to compile the C++ code
 def compile_code():
@@ -42,12 +43,25 @@ def run_code():
 
 # Main function to compile and run the code every 30 seconds and handle Ctrl+C
 def main():
+    run_enabled = True  # Flag to enable or disable running the code
+
     try:
         while True:
             os.system('clear' if os.name == 'posix' else 'cls')  # Clear the screen
             if compile_code():
-                run_code()
-            time.sleep(30)
+                if run_enabled:
+                    run_code()
+                else:
+                    print("Run mode is disabled. Skipping execution.")
+            print("\nPress 'r' to toggle run mode (enabled: {}) or wait 30 seconds...".format(run_enabled))
+
+            for _ in range(30):
+                if sys.stdin in select.select([sys.stdin], [], [], 1)[0]:
+                    user_input = sys.stdin.read(1).strip().lower()
+                    if user_input == 'r':
+                        run_enabled = not run_enabled
+                        print("Run mode toggled. Now enabled: {}".format(run_enabled))
+                        break
     except KeyboardInterrupt:
         print("\nExiting...")
         sys.exit(0)
