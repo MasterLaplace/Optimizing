@@ -200,11 +200,127 @@ private:
 
     [[nodiscard]] inline float intersect(const Ray &ray, const SpatialObject &object) const noexcept
     {
+#ifndef DEBUG_RAYTRACING
         // Créer une boîte englobante pour l'objet
         BoundaryBox box(object.position, object.size);
 
         // Calculer l'intersection entre le rayon et la boîte
         return intersect(ray, box);
+#else
+        // distance de l'intersection la plus près si elle existe
+        float distance;
+
+        // seuil de tolérance numérique du test d'intersection
+        float epsilon = 1e-6f;
+
+        // distance du point d'intersection
+        float t;
+
+        // vecteur entre le centre de la sphère et l'origine du rayon
+        glm::vec3 delta = object.position - ray.origin;
+
+        // calculer a
+        float a = glm::dot(delta, delta);
+
+        // calculer b
+        float b = glm::dot(delta, ray.direction);
+
+        // calculer c
+        float c = object.radius * object.radius;
+
+        // calculer le discriminant de l'équation quadratique
+        float discriminant = b * b - a + c;
+
+        // valider si le discriminant est négatif
+        if (discriminant < 0)
+        {
+            // il n'y a pas d'intersection avec cette sphère
+            return distance = 0;
+        }
+
+        // calculer la racine carrée du discriminant seulement si non négatif
+        discriminant = sqrt(discriminant);
+
+        // déterminer la distance de la première intersection
+        t = b - discriminant;
+
+        // valider si la distance de la première intersection est dans le seuil de tolérance
+        if (t > epsilon)
+            distance = t;
+        else
+        {
+            // déterminer la distance de la première intersection
+            t = b + discriminant;
+
+            // valider si la distance de la seconde intersection est dans le seuil de tolérance
+            if (t > epsilon)
+                distance = t;
+            else
+                distance = 0;
+        }
+
+        // retourner la distance du point d'intersection
+        return distance;
+#endif
+    }
+
+    void init_cornell_box()
+    {
+        constexpr float anchor = 1e5;
+        constexpr float wall_radius = anchor;
+
+        constexpr float box_size_x = 100.0;
+        constexpr float box_size_y = 81.6;
+        constexpr float box_size_z = 81.6;
+
+        constexpr float box_x_min = 0.0;
+        constexpr float box_x_max = box_size_x;
+        constexpr float box_y_min = 0.0;
+        constexpr float box_y_max = box_size_y;
+        constexpr float box_z_min = 0.0;
+        constexpr float box_z_max = box_size_z;
+
+        constexpr float box_center_x = (box_x_max - box_x_min) / 2.0;
+        constexpr float box_center_y = (box_y_max - box_y_min) / 2.0;
+        constexpr float box_center_z = (box_z_max - box_z_min) / 2.0;
+
+        // vider la scène de son contenu
+        _scene.clear();
+
+        // génération du contenu de la scène
+        _scene.insert(
+            _scene.begin(),
+            {
+
+                // approximation d'une boîte de Cornell avec des sphères surdimensionnées qui simulent des surfaces
+                // planes
+                SpatialObject(wall_radius, glm::vec3(box_center_x, anchor, box_size_z), glm::vec3(),
+                              glm::vec3(0.75, 0.75, 0.75),
+                              SurfaceType::DIFFUSE), // plancher
+                SpatialObject(wall_radius, glm::vec3(box_center_x, -anchor + box_size_y, box_size_z), glm::vec3(),
+                              glm::vec3(0.75, 0.75, 0.75), SurfaceType::DIFFUSE), // plafond
+                SpatialObject(wall_radius, glm::vec3(anchor + 1, box_center_y, box_size_z), glm::vec3(),
+                              glm::vec3(0.75, 0.25, 0.25),
+                              SurfaceType::DIFFUSE), // mur gauche
+                SpatialObject(wall_radius, glm::vec3(box_center_x, box_center_y, anchor), glm::vec3(),
+                              glm::vec3(0.25, 0.75, 0.25),
+                              SurfaceType::DIFFUSE), // mur arrière
+                SpatialObject(wall_radius, glm::vec3(-anchor + 99, box_center_y, box_size_z), glm::vec3(),
+                              glm::vec3(0.25, 0.25, 0.75),
+                              SurfaceType::DIFFUSE), // mur droit
+                SpatialObject(wall_radius, glm::vec3(box_center_x, box_center_y, -anchor + 170), glm::vec3(),
+                              glm::vec3(0.0, 0.0, 0.0),
+                              SurfaceType::DIFFUSE), // mur avant
+
+                // ensemble des sphères situées à l'intérieur de la boîte de Cornell
+                SpatialObject(22.5, glm::vec3(30, 30, 40), glm::vec3(), glm::vec3(1.0, 1.0, 1.0),
+                              SurfaceType::SPECULAR), // sphère mirroir
+                SpatialObject(17.5, glm::vec3(75, 40, 75), glm::vec3(), glm::vec3(1.0, 1.0, 1.0),
+                              SurfaceType::REFRACTION), // sphère de verre
+
+                SpatialObject(600, glm::vec3(box_center_x, 600.0 + box_size_z - 0.27, box_size_z),
+                              glm::vec3(15, 15, 15), glm::vec3(0.0, 0.0, 0.0), SurfaceType::DIFFUSE) // sphère lumineuse
+            });
     }
 
     void render() noexcept
@@ -222,8 +338,12 @@ private:
 
         glm::vec3 distance;
 
+#ifndef DEBUG_RAYTRACING
         _scene.clear();
         _worldPartition.getAllObects(_scene);
+#else
+        init_cornell_box();
+#endif
 
         // itération sur les rangées de pixels
         for (uint16_t y = 0u; y < _IMAGE_HEIGHT; ++y)
@@ -326,12 +446,12 @@ private:
         {
             // matériau avec réflexion diffuse
 
-            float r1 = 2 * M_PI * _random01(_rng);
+            float r1 = 2.f * M_PI * _random01(_rng);
             float r2 = _random01(_rng);
             float r2s = sqrt(r2);
 
             glm::vec3 w = na;
-            glm::vec3 u = glm::normalize(glm::cross(fabs(w.x) > 0.1 ? glm::vec3(0, 1, 0) : glm::vec3(1), w));
+            glm::vec3 u = glm::normalize(glm::cross(fabs(w.x) > 0.1f ? glm::vec3(0, 1, 0) : glm::vec3(1), w));
             glm::vec3 v = glm::cross(w, u);
             glm::vec3 d =
                 glm::normalize(u * float(cos(r1)) * r2s + v * float(sin(r1)) * r2s + w * float(sqrt(1.f - r2)));
@@ -345,7 +465,7 @@ private:
             // matériau avec réflexion spéculaire
 
             radiance = obj.emission +
-                       f * compute_radiance(Ray(x, ray.direction - n * 2.0f * glm::dot(n, ray.direction)), depth);
+                       f * compute_radiance(Ray(x, ray.direction - n * 2.f * glm::dot(n, ray.direction)), depth);
 
             return radiance;
         }
@@ -353,18 +473,18 @@ private:
         {
             // matériau avec réflexion réfraction
 
-            Ray reflection_ray(x, ray.direction - n * 2.0f * glm::dot(n, ray.direction));
+            Ray reflection_ray(x, ray.direction - n * 2.f * glm::dot(n, ray.direction));
 
             bool into = glm::dot(n, na) > 0;
 
-            float ior = 1.5; // indice de réfraction du verre
-            float nc = 1.0;
+            float ior = 1.5f; // indice de réfraction du verre
+            float nc = 1.f;
             float nt = ior;
             float nnt = into ? nc / nt : nt / nc;
             float ddn = glm::dot(ray.direction, na);
             float cos2t;
 
-            if ((cos2t = 1.0 - nnt * nnt * (1.0 - ddn * ddn)) < 0.0)
+            if ((cos2t = 1.f - nnt * nnt * (1.f - ddn * ddn)) < 0.f)
             {
                 radiance = obj.emission + f * compute_radiance(reflection_ray, depth);
 
@@ -372,7 +492,7 @@ private:
             }
 
             glm::vec3 tdir =
-                glm::normalize(ray.direction * nnt - n * float((into ? 1.0 : -1.0) * (ddn * nnt + sqrt(cos2t))));
+                glm::normalize(ray.direction * nnt - n * float((into ? 1.f : -1.f) * (ddn * nnt + sqrt(cos2t))));
 
             // effet de fresnel
             float a = nt - nc;
@@ -386,10 +506,10 @@ private:
             float tp = tr / (1.0 - p);
 
             radiance =
-                obj.emission + f * (depth > 2 ? (_random01(_rng) < p ? compute_radiance(reflection_ray, depth) * rp :
-                                                                       compute_radiance(Ray(x, tdir), depth) * tp) :
-                                                compute_radiance(reflection_ray, depth) * re +
-                                                    compute_radiance(Ray(x, tdir), depth) * tr);
+                obj.emission + f * (depth > 2u ? (_random01(_rng) < p ? compute_radiance(reflection_ray, depth) * rp :
+                                                                        compute_radiance(Ray(x, tdir), depth) * tp) :
+                                                 compute_radiance(reflection_ray, depth) * re +
+                                                     compute_radiance(Ray(x, tdir), depth) * tr);
 
             return radiance;
         }

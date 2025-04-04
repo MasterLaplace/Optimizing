@@ -77,10 +77,17 @@ enum class SurfaceType : uint8_t {
 };
 
 struct SpatialObject {
-    glm::vec3 position;
-    glm::vec3 velocity;
-    glm::vec3 size;
-    glm::vec4 colour;
-    SurfaceType material;
-    glm::vec3 emission;
+    glm::vec3 position{};
+    glm::vec3 velocity{};
+    glm::vec3 size{};
+    glm::vec4 colour{};
+    SurfaceType material = SurfaceType::DIFFUSE;
+    glm::vec3 emission{};
+    float radius = 0.0f;
+
+    SpatialObject() = default;
+    SpatialObject(double r, glm::vec3 p, glm::vec3 e, glm::vec3 c, SurfaceType m)
+        : radius(r), position(p), emission(e), colour(c.r, c.g, c.b, 255.f), material(m)
+    {
+    }
 };

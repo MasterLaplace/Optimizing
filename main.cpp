@@ -35,11 +35,11 @@ int main()
     worldPartition.insert(objects);
 #else
     Raytracing::CreateInfo createInfo;
-    createInfo.position = {0, 0, 0};
+    createInfo.position = {50, 50, 300};
     createInfo.direction = glm::normalize(glm::vec3{0, -0.042612, -1});
     createInfo.background_color = {0, 0, 0};
-    createInfo.fov = 90;
-    createInfo.depth = 5;
+    createInfo.fov = 0.5135f; // ~30 degrés
+    createInfo.depth = 5u;
     createInfo.width = 800;
     createInfo.height = 600;
     createInfo.ray_per_pixel = 16;
