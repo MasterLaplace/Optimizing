@@ -58,7 +58,7 @@ template <> struct hash<sf::Vector2i> {
 
 class Partition {
 public:
-    Partition(const sf::Vector3f &pos, const sf::Vector3f &size)
+    Partition(const glm::vec3 &pos, const glm::vec3 &size)
         : _pos(pos), _size(size), _octree(BoundaryBox(pos, size), MAX_CAPACITY, MAX_DEPTH)
     {
     }
@@ -73,7 +73,7 @@ public:
         _loaded = true;
 
         for (const auto &obj : _objects)
-            _octree.insert(obj, BoundaryBox(obj.vPos, obj.vSize));
+            _octree.insert(obj, BoundaryBox(obj.position, obj.size));
 
         std::cout << "Cellule " << _pos.x << " " << _pos.y << " chargée." << std::endl;
     }
@@ -88,21 +88,21 @@ public:
         std::cout << "Cellule " << _pos.x << " " << _pos.y << " déchargée." << std::endl;
     }
 
-    void draw(sf::RenderWindow &window, const sf::Vector3f &player_pos)
+    void draw(sf::RenderWindow &window, const glm::vec3 &player_pos)
     {
         if (!_loaded || _objects.empty())
             return;
 
-        sf::Vector3f size{50, 50, std::numeric_limits<float>::max()};
+        glm::vec3 size{50, 50, std::numeric_limits<float>::max()};
         BoundaryBox boundaryBox(size * -0.5f + player_pos, size);
 
         DEBUG_LINE(auto start = std::chrono::high_resolution_clock::now());
         for (const auto &obj : _octree.search(boundaryBox))
         {
             sf::RectangleShape rect;
-            rect.setPosition({obj->item.vPos.x, obj->item.vPos.y});
-            rect.setSize({obj->item.vSize.x, obj->item.vSize.y});
-            rect.setFillColor(obj->item.colour);
+            rect.setPosition({obj->item.position.x, obj->item.position.y});
+            rect.setSize({obj->item.size.x, obj->item.size.y});
+            rect.setFillColor(sf::Color(obj->item.colour.r, obj->item.colour.g, obj->item.colour.b, obj->item.colour.a));
             window.draw(rect);
             DEBUG_LINE(++_objCount);
         }
@@ -132,8 +132,8 @@ public:
     }
 
 private:
-    sf::Vector3f _pos;
-    sf::Vector3f _size;
+    glm::vec3 _pos;
+    glm::vec3 _size;
     std::vector<SpatialObject> _objects;
     DynamicOctreeContainer<SpatialObject> _octree;
     DEBUG_LINE(size_t _objCount = 0);
@@ -149,10 +149,10 @@ public:
         std::lock_guard<std::mutex> lock(_mutex);
         for (const auto &obj : _objects)
         {
-            sf::Vector2i grid = {static_cast<int>(obj.vPos.x / _size.x), static_cast<int>(obj.vPos.y / _size.y)};
+            sf::Vector2i grid = {static_cast<int>(obj.position.x / _size.x), static_cast<int>(obj.position.y / _size.y)};
 
             if (_cells.find(grid) == _cells.end())
-                _cells[grid] = std::make_shared<Partition>(sf::Vector3f(grid.x * _size.x, grid.y * _size.y, 0), _size);
+                _cells[grid] = std::make_shared<Partition>(glm::vec3(grid.x * _size.x, grid.y * _size.y, 0), _size);
 
             _cells[grid]->insert(obj);
         }
@@ -162,7 +162,7 @@ public:
     {
         std::lock_guard<std::mutex> lock(_mutex);
         if (_cells.find(grid) == _cells.end())
-            _cells[grid] = std::make_shared<Partition>(sf::Vector3f(grid.x * _size.x, grid.y * _size.y, 0), _size);
+            _cells[grid] = std::make_shared<Partition>(glm::vec3(grid.x * _size.x, grid.y * _size.y, 0), _size);
 
         _threadPool.enqueue(&Partition::load_data, _cells[grid]);
     }
@@ -203,7 +203,7 @@ public:
     }
 
 private:
-    sf::Vector3f _size = {255, 255, std::numeric_limits<float>::max()};
+    glm::vec3 _size = {255, 255, std::numeric_limits<float>::max()};
     std::unordered_map<sf::Vector2i, std::shared_ptr<Partition>> _cells;
     std::mutex _mutex;
     ThreadPool _threadPool;

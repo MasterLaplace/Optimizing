@@ -1,7 +1,7 @@
 #ifndef RAYTRACING
-#include "WorldPartition.hpp"
+#    include "WorldPartition.hpp"
 #else
-#include "Raytracing.hpp"
+#    include "Raytracing.hpp"
 #endif
 
 int main()
@@ -23,9 +23,9 @@ int main()
     for (size_t i = 0; i < nbObjects; ++i)
     {
         SpatialObject obj;
-        obj.vPos = {randfloat(pos.x, maxArea.x), randfloat(pos.y, maxArea.y), randfloat(pos.z, maxArea.z)};
-        obj.vVel = {randfloat(0, 10), randfloat(0, 10), randfloat(0, 10)};
-        obj.vSize = {randfloat(0, 10), randfloat(0, 10), randfloat(0, 10)};
+        obj.position = {randfloat(pos.x, maxArea.x), randfloat(pos.y, maxArea.y), randfloat(pos.z, maxArea.z)};
+        obj.velocity = {randfloat(0, 10), randfloat(0, 10), randfloat(0, 10)};
+        obj.size = {randfloat(0, 10), randfloat(0, 10), randfloat(0, 10)};
         obj.colour = sf::Color(rand() % 255, rand() % 255, rand() % 255, 255);
 
         objects.emplace_back(obj);
@@ -41,7 +41,7 @@ int main()
     createInfo.depth = 5;
     createInfo.width = 800;
     createInfo.height = 600;
-    createInfo.ray_per_pixel = 1;
+    createInfo.ray_per_pixel = 16;
 #endif
 
     sf::RectangleShape player_rect({10, 10});

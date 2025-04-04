@@ -35,6 +35,8 @@
 
 #include "BoundaryBox.hpp"
 
+#include <SFML/Graphics.hpp>
+
 #include <algorithm>
 #include <array>
 #include <list>
@@ -79,8 +81,8 @@ public:
         clear();
         _boundary = rArea;
 
-        sf::Vector3f size = _boundary.getSize() * 0.5f;
-        sf::Vector3f pos = _boundary.getMin();
+        glm::vec3 size = _boundary.getSize() * 0.5f;
+        glm::vec3 pos = _boundary.getMin();
 
         _rNodes[static_cast<size_t>(INDEX::SWD)] = BoundaryBox(pos, size);
         _rNodes[static_cast<size_t>(INDEX::SED)] = BoundaryBox({pos.x + size.x, pos.y, pos.z}, size);
