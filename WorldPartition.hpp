@@ -26,7 +26,11 @@
 
 #include "DynamicOctree.hpp"
 #include "ThreadPool.hpp"
+#include <chrono>
+#include <fstream>
+#include <iostream>
 #include <limits>
+#include <random>
 #include <unordered_map>
 
 #ifdef DEBUG
@@ -44,6 +48,14 @@ template <> struct hash<sf::Vector2i> {
 };
 } // namespace std
 
+[[nodiscard]] float randfloat(const float min, const float max) noexcept
+{
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    std::uniform_real_distribution<float> dis(min, max);
+    return dis(gen);
+};
+
 class Partition {
 public:
     Partition(const sf::Vector3f &pos, const sf::Vector3f &size)
@@ -52,7 +64,7 @@ public:
     }
     ~Partition() = default;
 
-    void insert(const SomeObjectWithArea &obj) { _objects.emplace_back(obj); }
+    void insert(const SpatialObject &obj) { _objects.emplace_back(obj); }
 
     void load_data()
     {
@@ -122,8 +134,8 @@ public:
 private:
     sf::Vector3f _pos;
     sf::Vector3f _size;
-    std::vector<SomeObjectWithArea> _objects;
-    DynamicOctreeContainer<SomeObjectWithArea> _octree;
+    std::vector<SpatialObject> _objects;
+    DynamicOctreeContainer<SpatialObject> _octree;
     DEBUG_LINE(size_t _objCount = 0);
     bool _loaded = false;
 };
@@ -132,7 +144,7 @@ class WorldPartition {
 public:
     WorldPartition() : _threadPool(std::thread::hardware_concurrency()) {}
 
-    void insert(const std::vector<SomeObjectWithArea> &_objects)
+    void insert(const std::vector<SpatialObject> &_objects)
     {
         std::lock_guard<std::mutex> lock(_mutex);
         for (const auto &obj : _objects)

@@ -37,13 +37,8 @@
 
 #include <algorithm>
 #include <array>
-#include <chrono>
-#include <cmath>
-#include <fstream>
-#include <iostream>
 #include <list>
 #include <memory>
-#include <random>
 #include <vector>
 
 template <typename OBJ_TYPE> struct OctreeItemLocation {

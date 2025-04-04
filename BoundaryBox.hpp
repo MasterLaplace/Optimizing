@@ -70,9 +70,16 @@ protected:
     sf::Vector3f _max{1, 1, 1};
 };
 
-struct SomeObjectWithArea {
+enum class SurfaceType : uint8_t {
+    DIFFUSE,
+    SPECULAR,
+    REFRACTION
+};
+
+struct SpatialObject {
     sf::Vector3f vPos;
     sf::Vector3f vVel;
     sf::Vector3f vSize;
     sf::Color colour;
+    SurfaceType material;
 };

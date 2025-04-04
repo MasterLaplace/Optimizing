@@ -1,31 +1,28 @@
+#ifndef RAYTRACING
 #include "WorldPartition.hpp"
-
-[[nodiscard]] static float randfloat(const float min, const float max) noexcept
-{
-    static std::random_device rd;
-    static std::mt19937 gen(rd());
-    std::uniform_real_distribution<float> dis(min, max);
-    return dis(gen);
-};
+#else
+#include "Raytracing.hpp"
+#endif
 
 int main()
 {
     sf::RenderWindow window(sf::VideoMode(800, 600), "World Partition - Octree", sf::Style::Close);
     window.setFramerateLimit(60);
 
+#ifndef RAYTRACING
     WorldPartition worldPartition;
 
     size_t nbObjects = 100000;
     sf::Vector3f pos = {0, 0, 0};
     sf::Vector3f size = {800, 600, 50};
     sf::Vector3f maxArea = pos + size;
-    std::vector<SomeObjectWithArea> objects;
+    std::vector<SpatialObject> objects;
 
     objects.reserve(nbObjects);
 
     for (size_t i = 0; i < nbObjects; ++i)
     {
-        SomeObjectWithArea obj;
+        SpatialObject obj;
         obj.vPos = {randfloat(pos.x, maxArea.x), randfloat(pos.y, maxArea.y), randfloat(pos.z, maxArea.z)};
         obj.vVel = {randfloat(0, 10), randfloat(0, 10), randfloat(0, 10)};
         obj.vSize = {randfloat(0, 10), randfloat(0, 10), randfloat(0, 10)};
@@ -35,6 +32,17 @@ int main()
     }
 
     worldPartition.insert(objects);
+#else
+    Raytracing::CreateInfo createInfo;
+    createInfo.position = {0, 0, 0};
+    createInfo.direction = glm::normalize(glm::vec3{0, -0.042612, -1});
+    createInfo.background_color = {0, 0, 0};
+    createInfo.fov = 90;
+    createInfo.depth = 5;
+    createInfo.width = 800;
+    createInfo.height = 600;
+    createInfo.ray_per_pixel = 1;
+#endif
 
     sf::RectangleShape player_rect({10, 10});
     player_rect.setFillColor(sf::Color::Red);
@@ -60,10 +68,14 @@ int main()
         if (sf::Keyboard::isKeyPressed(sf::Keyboard::Down))
             player_rect.move(0, 500 * deltaTime);
 
-        worldPartition.update(player_rect);
-
         window.clear();
+
+#ifndef RAYTRACING
+        worldPartition.update(player_rect);
         worldPartition.draw(window, player_rect.getPosition());
+#else
+#endif
+
         window.draw(player_rect);
         window.display();
     }
