@@ -1,4 +1,4 @@
-#include "Partition.hpp"
+#include "WorldPartition.hpp"
 
 int main()
 {
@@ -42,5 +42,5 @@ int main()
     return 0;
 }
 
-// Build : g++ -std=c++20 -o optimizing main.cpp -lsfml-graphics -lsfml-window -lsfml-system
+// Build : g++ -std=c++20 -o optimizing main.cpp -I/usr/include -lsfml-graphics -lsfml-window -lsfml-system
 // Run : ./optimizing
