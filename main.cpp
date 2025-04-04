@@ -1,3 +1,4 @@
+#define RAYTRACING
 #ifndef RAYTRACING
 #    include "WorldPartition.hpp"
 #else
@@ -42,6 +43,7 @@ int main()
     createInfo.width = 800;
     createInfo.height = 600;
     createInfo.ray_per_pixel = 16;
+    Raytracing raytracing(createInfo);
 #endif
 
     sf::RectangleShape player_rect({10, 10});
@@ -74,6 +76,7 @@ int main()
         worldPartition.update(player_rect);
         worldPartition.draw(window, player_rect.getPosition());
 #else
+        raytracing.update(window);
 #endif
 
         window.draw(player_rect);
