@@ -206,6 +206,25 @@ public:
         return false;
     }
 
+#ifdef DEBUG
+    inline void draw(sf::RenderWindow &window, const BoundaryBox &rArea) const noexcept
+    {
+        sf::RectangleShape rectangle;
+        rectangle.setPosition({rArea.getMin().x, rArea.getMin().y});
+        rectangle.setSize({rArea.getMax().x - rArea.getMin().x, rArea.getMax().y - rArea.getMin().y});
+        rectangle.setFillColor(sf::Color::Transparent);
+        rectangle.setOutlineColor(sf::Color::Green);
+        rectangle.setOutlineThickness(1);
+        window.draw(rectangle);
+
+        for (uint8_t i = 0; i < 8u; ++i)
+        {
+            if (_nodes[i])
+                _nodes[i]->draw(window, rArea);
+        }
+    }
+#endif
+
 protected:
     const uint8_t _DEPTH = 1;
     const uint8_t _CAPACITY = 4;
@@ -283,6 +302,13 @@ public:
         item->pItem.container->erase(item->pItem.iterator);
         item->pItem = _root.insert(item, itemsize);
     }
+
+#ifdef DEBUG
+    inline void draw(sf::RenderWindow &window, const BoundaryBox &rArea) const noexcept
+    {
+        _root.draw(window, rArea);
+    }
+#endif
 
 protected:
     OctreeContainer _allItems;

@@ -112,6 +112,8 @@ public:
             logFile << "OctTree: " << _objCount << " objects displayed in " << duration.count() << " seconds\n";
         }
 
+        _octree.draw(window, boundaryBox);
+
         _objCount = 0;
 #endif
     }
