@@ -74,6 +74,7 @@ public:
     {
         resize(boundary);
     }
+    ~DynamicOctree() = default;
 
     inline void resize(const BoundaryBox &rArea) noexcept
     {
@@ -112,7 +113,7 @@ public:
         _boundary = BoundaryBox();
     }
 
-    [[nodiscard]] inline size_t size() const noexcept
+    [[nodiscard, deprecated("Use DynamicOctreeContainer::size() instead.")]] inline size_t size() const noexcept
     {
         size_t size = _pItems.size();
 
@@ -253,6 +254,7 @@ public:
         : _root(size, capacity, depth)
     {
     }
+    ~DynamicOctreeContainer() = default;
 
     inline void resize(const BoundaryBox &rArea) noexcept { _root.resize(rArea); }
 
@@ -304,10 +306,7 @@ public:
     }
 
 #ifdef DEBUG
-    inline void draw(sf::RenderWindow &window, const BoundaryBox &rArea) const noexcept
-    {
-        _root.draw(window, rArea);
-    }
+    inline void draw(sf::RenderWindow &window, const BoundaryBox &rArea) const noexcept { _root.draw(window, rArea); }
 #endif
 
 protected:

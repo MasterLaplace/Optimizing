@@ -50,34 +50,35 @@ public:
         : _pos(pos), _size(size), _octree(BoundaryBox(pos, size), MAX_CAPACITY, MAX_DEPTH)
     {
     }
+    ~Partition() = default;
+
+    void insert(const SomeObjectWithArea &obj) { _objects.emplace_back(obj); }
 
     void load_data()
     {
+        if (_objects.empty() || (_loaded && _objects.size() == _octree.size()))
+            return;
         _loaded = true;
 
-        size_t nbObjects = 1000;
-        sf::Vector3f maxArea = _pos + _size;
-
-        _objects.reserve(nbObjects);
-
-        for (size_t i = 0; i < nbObjects; ++i)
-        {
-            SomeObjectWithArea obj;
-            obj.vPos = {randfloat(_pos.x, maxArea.x), randfloat(_pos.y, maxArea.y), randfloat(_pos.z, maxArea.z)};
-            obj.vVel = {randfloat(0, 10), randfloat(0, 10), randfloat(0, 10)};
-            obj.vSize = {randfloat(0, 10), randfloat(0, 10), randfloat(0, 10)};
-            obj.colour = sf::Color(rand() % 255, rand() % 255, rand() % 255, 255);
-
-            _objects.emplace_back(obj);
+        for (const auto &obj : _objects)
             _octree.insert(obj, BoundaryBox(obj.vPos, obj.vSize));
-        }
 
         std::cout << "Cellule " << _pos.x << " " << _pos.y << " chargée." << std::endl;
     }
 
-    void draw(sf::RenderWindow &window, const sf::Vector3f &player_pos)
+    void unload_data()
     {
         if (!_loaded)
+            return;
+
+        _loaded = false;
+        _octree.clear();
+        std::cout << "Cellule " << _pos.x << " " << _pos.y << " déchargée." << std::endl;
+    }
+
+    void draw(sf::RenderWindow &window, const sf::Vector3f &player_pos)
+    {
+        if (!_loaded || _objects.empty())
             return;
 
         sf::Vector3f size{50, 50, std::numeric_limits<float>::max()};
@@ -119,15 +120,6 @@ public:
     }
 
 private:
-    [[nodiscard]] static float randfloat(const float min, const float max)
-    {
-        static std::random_device rd;
-        static std::mt19937 gen(rd());
-        std::uniform_real_distribution<float> dis(min, max);
-        return dis(gen);
-    };
-
-private:
     sf::Vector3f _pos;
     sf::Vector3f _size;
     std::vector<SomeObjectWithArea> _objects;
@@ -140,25 +132,32 @@ class WorldPartition {
 public:
     WorldPartition() : _threadPool(std::thread::hardware_concurrency()) {}
 
+    void insert(const std::vector<SomeObjectWithArea> &_objects)
+    {
+        std::lock_guard<std::mutex> lock(_mutex);
+        for (const auto &obj : _objects)
+        {
+            sf::Vector2i grid = {static_cast<int>(obj.vPos.x / _size.x), static_cast<int>(obj.vPos.y / _size.y)};
+
+            if (_cells.find(grid) == _cells.end())
+                _cells[grid] = std::make_shared<Partition>(sf::Vector3f(grid.x * _size.x, grid.y * _size.y, 0), _size);
+
+            _cells[grid]->insert(obj);
+        }
+    }
+
     void load_partition(sf::Vector2i grid)
     {
         std::lock_guard<std::mutex> lock(_mutex);
         if (_cells.find(grid) == _cells.end())
-        {
             _cells[grid] = std::make_shared<Partition>(sf::Vector3f(grid.x * _size.x, grid.y * _size.y, 0), _size);
-            _threadPool.enqueue(&Partition::load_data, _cells[grid]);
-            std::cout << "Lancement du chargement de la cellule " << grid.x << ", " << grid.y << std::endl;
-        }
+
+        _threadPool.enqueue(&Partition::load_data, _cells[grid]);
     }
 
-    void unload_partition(sf::Vector2i grid)
+    void unload_partition(const std::pair<sf::Vector2i, std::shared_ptr<Partition>> &cell)
     {
-        std::lock_guard<std::mutex> lock(_mutex);
-        if (_cells.find(grid) != _cells.end())
-        {
-            _cells.erase(grid);
-            std::cout << "Déchargement de la cellule " << grid.x << ", " << grid.y << std::endl;
-        }
+        cell.second->unload_data();
     }
 
     void update(sf::RectangleShape player_rect)
@@ -174,21 +173,11 @@ public:
             }
         }
 
-        std::vector<sf::Vector2i> cells_to_unload;
+        std::lock_guard<std::mutex> lock(_mutex);
+        for (const auto &cell : _cells)
         {
-            std::lock_guard<std::mutex> lock(_mutex);
-            for (const auto &cell : _cells)
-            {
-                if (abs(cell.first.x - player_grid.x) > 1 || abs(cell.first.y - player_grid.y) > 1)
-                {
-                    cells_to_unload.push_back(cell.first);
-                }
-            }
-        }
-
-        for (const auto &cell : cells_to_unload)
-        {
-            unload_partition(cell);
+            if (abs(cell.first.x - player_grid.x) > 1 || abs(cell.first.y - player_grid.y) > 1)
+                unload_partition(cell);
         }
     }
 
