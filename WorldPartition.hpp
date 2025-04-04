@@ -56,6 +56,14 @@ template <> struct hash<sf::Vector2i> {
     return dis(gen);
 };
 
+[[nodiscard]] double randdouble(const double min, const double max) noexcept
+{
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    std::uniform_real_distribution<double> dis(min, max);
+    return dis(gen);
+};
+
 class Partition {
 public:
     Partition(const glm::vec3 &pos, const glm::vec3 &size)

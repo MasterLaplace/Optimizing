@@ -40,51 +40,90 @@
 class Raytracing {
 public:
     struct CreateInfo {
-        glm::vec3 position;
-        glm::vec3 direction;
-        glm::vec3 background_color;
-        float fov;
+        glm::dvec3 position;
+        glm::dvec3 direction;
+        glm::dvec3 background_color;
+        double fov;
         uint8_t depth;
         uint16_t width;
         uint16_t height;
-        uint8_t ray_per_pixel;
+        uint16_t ray_per_pixel;
         // Je vais le changer pour me basé sur la position de la caméra et les cellules de la world partition qui sont
         // chargées pour calculer la boundary box totale de la scène, se qui va me permettre de faire le raytracing sur
         // la scène entière (et pas seulement sur la cellule courante).
-        glm::vec3
+        glm::dvec3
             scene_pos_min; // Will be replaced by the current position of the camera - the world partition's cell * 0.5f
-        glm::vec3 scene_scene_max; // Will be replaced by the current position of the camera + the world partition's
-                                   // cell * 0.5f
+        glm::dvec3 scene_scene_max; // Will be replaced by the current position of the camera + the world partition's
+                                    // cell * 0.5f
     };
 
 private:
-    struct Ray {
-        glm::vec3 origin;
-        glm::vec3 direction;
+    struct Vector {
+        double x, y, z;
 
-        Ray(glm::vec3 o, glm::vec3 d) : origin(o), direction(d) {}
+        constexpr Vector() : x(0.0), y(0.0), z(0.0) {}
+        constexpr Vector(double x) : x(x), y(0.0), z(0.0) {}
+        constexpr Vector(double x, double y) : x(x), y(y), z(0.0) {}
+        constexpr Vector(double x, double y, double z) : x(x), y(y), z(z) {}
+        constexpr Vector(const glm::dvec3 &v) : x(v.x), y(v.y), z(v.z) {}
+        constexpr Vector(const glm::vec3 &v) : x(v.x), y(v.y), z(v.z) {}
+
+        // produit scalaire (dot product)
+        double dot(const Vector &v) const { return x * v.x + y * v.y + z * v.z; }
+
+        // produit vectoriel (cross product)
+        Vector cross(const Vector &v) const { return Vector(y * v.z - z * v.y, z * v.x - x * v.z, x * v.y - y * v.x); }
+
+        // multiplication vectorielle
+        Vector multiply(const Vector &v) const { return Vector(x * v.x, y * v.y, z * v.z); }
+
+        // multiplication scalaire
+        Vector operator*(double s) const { return Vector(x * s, y * s, z * s); }
+
+        // addition vectorielle
+        Vector operator+(const Vector &v) const { return Vector(x + v.x, y + v.y, z + v.z); }
+
+        // soustraction vectorielle
+        Vector operator-(const Vector &v) const { return Vector(x - v.x, y - v.y, z - v.z); }
+
+        double operator[](size_t i) const
+        {
+            switch (i)
+            {
+            case 0: return x;
+            case 1: return y;
+            case 2: return z;
+            default: return 0.0;
+            }
+        }
+
+        // normalisation
+        Vector &normalize() { return *this = *this * (1.0 / sqrt(x * x + y * y + z * z)); }
+    };
+
+    struct Ray {
+        Vector origin;
+        Vector direction;
+
+        Ray(Vector o, Vector d) : origin(o), direction(d) {}
     };
 
     struct Camera {
-        glm::vec3 position;
-        glm::vec3 orientation;
-        glm::vec3 target;
+        Vector position;
+        Vector orientation;
 
-        glm::vec3 axis_x;
-        glm::vec3 axis_y;
-        glm::vec3 axis_z;
+        Vector axis_x;
+        Vector axis_y;
+        Vector axis_z;
 
-        glm::vec3 up;
+        const uint16_t _VIEWPORT_WIDTH = 0;
+        const uint16_t _VIEWPORT_HEIGHT = 0;
 
-        const float _VIEWPORT_WIDTH = 0.0f;
-        const float _VIEWPORT_HEIGHT = 0.0f;
+        const double _FOV = 0.0f;
 
-        const float _FOV = 0.0f;
-
-        Camera(glm::vec3 p, glm::vec3 o, const uint16_t viewport_height, const uint16_t viewport_width, const float fov)
-            : position(p), orientation(o), target(glm::vec3(0.0f)), up(glm::vec3(0.0f, 1.0f, 0.0f)),
-              _VIEWPORT_WIDTH(static_cast<float>(viewport_width)),
-              _VIEWPORT_HEIGHT(static_cast<float>(viewport_height)), _FOV(fov)
+        Camera(glm::dvec3 p, glm::dvec3 o, const uint16_t viewport_height, const uint16_t viewport_width,
+               const double fov)
+            : position(p), orientation(o), _VIEWPORT_WIDTH(viewport_width), _VIEWPORT_HEIGHT(viewport_height), _FOV(fov)
         {
             calibrate();
         }
@@ -93,16 +132,16 @@ private:
         void calibrate()
         {
             axis_z = orientation;
-            axis_x = glm::vec3(_VIEWPORT_WIDTH * _FOV / _VIEWPORT_HEIGHT);
-            axis_y = glm::normalize(glm::cross(axis_x, axis_z)) * _FOV;
+            axis_x = Vector(_VIEWPORT_WIDTH * _FOV / _VIEWPORT_HEIGHT);
+            axis_y = axis_x.cross(axis_z).normalize() * _FOV;
         }
     };
 
 public:
     Raytracing(const CreateInfo &params)
         : _MAX_DEPTH(params.depth), _CAMERA_FOV(params.fov), _CAMERA_POSITION(params.position),
-          _CAMERA_ORIENTATION(glm::normalize(params.direction)), _BACKGROUND_COLOR(params.background_color),
-          _IMAGE_WIDTH(params.width), _IMAGE_HEIGHT(params.height), _RAY_PER_PIXEL(params.ray_per_pixel),
+          _CAMERA_ORIENTATION(params.direction), _BACKGROUND_COLOR(params.background_color), _IMAGE_WIDTH(params.width),
+          _IMAGE_HEIGHT(params.height), _RAY_PER_PIXEL(params.ray_per_pixel),
           _PIXEL_COUNT(params.width * params.height),
           _camera(params.position, params.direction, params.height, params.width, params.fov)
     {
@@ -119,9 +158,9 @@ public:
         for (size_t i = 0; i < nbObjects; ++i)
         {
             SpatialObject obj;
-            obj.position = {randfloat(pos.x, maxArea.x), randfloat(pos.y, maxArea.y), randfloat(pos.z, maxArea.z)};
-            obj.velocity = {randfloat(0, 10), randfloat(0, 10), randfloat(0, 10)};
-            obj.size = {randfloat(0, 20), randfloat(0, 20), randfloat(0, 20)};
+            obj.position = {randdouble(pos.x, maxArea.x), randdouble(pos.y, maxArea.y), randdouble(pos.z, maxArea.z)};
+            obj.velocity = {randdouble(0, 10), randdouble(0, 10), randdouble(0, 10)};
+            obj.size = {randdouble(0, 20), randdouble(0, 20), randdouble(0, 20)};
             obj.colour = glm::vec4(rand() % 255, rand() % 255, rand() % 255, 255);
             obj.material = static_cast<SurfaceType>(rand() % 3);
 
@@ -150,9 +189,9 @@ public:
     }
 
 private:
-    [[nodiscard]] inline float clamp(float x) const noexcept { return x < 0 ? 0 : x > 1 ? 1 : x; }
+    [[nodiscard]] inline double clamp(double x) const noexcept { return x < 0 ? 0 : x > 1 ? 1 : x; }
 
-    [[nodiscard]] inline uint8_t format_color_component(float value) const noexcept
+    [[nodiscard]] inline uint8_t format_color_component(double value) const noexcept
     {
         // clamp la valeur entre 0 et 1
         value = clamp(value);
@@ -161,25 +200,25 @@ private:
         value = pow(clamp(value), _GAMMA_CORRECTION);
 
         // convertir la valeur dans l'espace de couleur
-        value = value * 255.f + 0.5f;
+        value = value * 255.0 + 0.5;
 
         // conversion numérique de réel vers entier
         return static_cast<uint8_t>(value);
     }
 
-    [[nodiscard]] inline float intersect(const Ray &ray, const BoundaryBox &box) const noexcept
+    [[nodiscard]] inline double intersect(const Ray &ray, const BoundaryBox &box) const noexcept
     {
         // Initialiser les limites de l'intersection
-        float tMin = 0.0f;
-        float tMax = std::numeric_limits<float>::max();
+        double tMin = 0.0f;
+        double tMax = std::numeric_limits<double>::max();
 
         // Parcourir chaque axe (x, y, z)
         for (uint8_t i = 0; i < 3u; ++i)
         {
             // Inverser la direction du rayon pour éviter la division par zéro
-            float invD = 1.0f / ray.direction[i];
-            float t0 = (box.getMin()[i] - ray.origin[i]) * invD;
-            float t1 = (box.getMax()[i] - ray.origin[i]) * invD;
+            double invD = 1.0f / ray.direction[i];
+            double t0 = (box.getMin()[i] - ray.origin[i]) * invD;
+            double t1 = (box.getMax()[i] - ray.origin[i]) * invD;
 
             // Assurer que t0 est le plus petit et t1 le plus grand
             if (invD < 0.0f)
@@ -198,7 +237,7 @@ private:
         return tMin;
     }
 
-    [[nodiscard]] inline float intersect(const Ray &ray, const SpatialObject &object) const noexcept
+    [[nodiscard]] inline double intersect(const Ray &ray, const SpatialObject &object) const noexcept
     {
 #ifndef DEBUG_RAYTRACING
         // Créer une boîte englobante pour l'objet
@@ -208,28 +247,28 @@ private:
         return intersect(ray, box);
 #else
         // distance de l'intersection la plus près si elle existe
-        float distance;
+        double distance;
 
         // seuil de tolérance numérique du test d'intersection
-        float epsilon = 1e-6f;
+        double epsilon = 1e-4f;
 
         // distance du point d'intersection
-        float t;
+        double t;
 
         // vecteur entre le centre de la sphère et l'origine du rayon
-        glm::vec3 delta = object.position - ray.origin;
+        Vector delta = Vector(object.position) - ray.origin;
 
         // calculer a
-        float a = glm::dot(delta, delta);
+        double a = delta.dot(delta);
 
         // calculer b
-        float b = glm::dot(delta, ray.direction);
+        double b = delta.dot(ray.direction);
 
         // calculer c
-        float c = object.radius * object.radius;
+        double c = object.radius * object.radius;
 
         // calculer le discriminant de l'équation quadratique
-        float discriminant = b * b - a + c;
+        double discriminant = b * b - a + c;
 
         // valider si le discriminant est négatif
         if (discriminant < 0)
@@ -253,10 +292,7 @@ private:
             t = b + discriminant;
 
             // valider si la distance de la seconde intersection est dans le seuil de tolérance
-            if (t > epsilon)
-                distance = t;
-            else
-                distance = 0;
+            distance = (t > epsilon) ? t : 0;
         }
 
         // retourner la distance du point d'intersection
@@ -266,69 +302,68 @@ private:
 
     void init_cornell_box()
     {
-        constexpr float anchor = 1e5;
-        constexpr float wall_radius = anchor;
+        constexpr double anchor = 1e5;
+        constexpr double wall_radius = anchor;
 
-        constexpr float box_size_x = 100.0;
-        constexpr float box_size_y = 81.6;
-        constexpr float box_size_z = 81.6;
+        constexpr double box_size_x = 100.0;
+        constexpr double box_size_y = 81.6;
+        constexpr double box_size_z = 81.6;
 
-        constexpr float box_x_min = 0.0;
-        constexpr float box_x_max = box_size_x;
-        constexpr float box_y_min = 0.0;
-        constexpr float box_y_max = box_size_y;
-        constexpr float box_z_min = 0.0;
-        constexpr float box_z_max = box_size_z;
+        constexpr double box_x_min = 0.0;
+        constexpr double box_x_max = box_size_x;
+        constexpr double box_y_min = 0.0;
+        constexpr double box_y_max = box_size_y;
+        constexpr double box_z_min = 0.0;
+        constexpr double box_z_max = box_size_z;
 
-        constexpr float box_center_x = (box_x_max - box_x_min) / 2.0;
-        constexpr float box_center_y = (box_y_max - box_y_min) / 2.0;
-        constexpr float box_center_z = (box_z_max - box_z_min) / 2.0;
+        constexpr double box_center_x = (box_x_max - box_x_min) / 2.0;
+        constexpr double box_center_y = (box_y_max - box_y_min) / 2.0;
+        constexpr double box_center_z = (box_z_max - box_z_min) / 2.0;
 
         // vider la scène de son contenu
         _scene.clear();
 
         // génération du contenu de la scène
-        _scene.insert(
-            _scene.begin(),
-            {
+        _scene.insert(_scene.begin(),
+                      {
 
-                // approximation d'une boîte de Cornell avec des sphères surdimensionnées qui simulent des surfaces
-                // planes
-                SpatialObject(wall_radius, glm::vec3(box_center_x, anchor, box_size_z), glm::vec3(),
-                              glm::vec3(0.75, 0.75, 0.75),
-                              SurfaceType::DIFFUSE), // plancher
-                SpatialObject(wall_radius, glm::vec3(box_center_x, -anchor + box_size_y, box_size_z), glm::vec3(),
-                              glm::vec3(0.75, 0.75, 0.75), SurfaceType::DIFFUSE), // plafond
-                SpatialObject(wall_radius, glm::vec3(anchor + 1, box_center_y, box_size_z), glm::vec3(),
-                              glm::vec3(0.75, 0.25, 0.25),
-                              SurfaceType::DIFFUSE), // mur gauche
-                SpatialObject(wall_radius, glm::vec3(box_center_x, box_center_y, anchor), glm::vec3(),
-                              glm::vec3(0.25, 0.75, 0.25),
-                              SurfaceType::DIFFUSE), // mur arrière
-                SpatialObject(wall_radius, glm::vec3(-anchor + 99, box_center_y, box_size_z), glm::vec3(),
-                              glm::vec3(0.25, 0.25, 0.75),
-                              SurfaceType::DIFFUSE), // mur droit
-                SpatialObject(wall_radius, glm::vec3(box_center_x, box_center_y, -anchor + 170), glm::vec3(),
-                              glm::vec3(0.0, 0.0, 0.0),
-                              SurfaceType::DIFFUSE), // mur avant
+                          // approximation d'une boîte de Cornell avec des sphères surdimensionnées qui simulent des
+                          // surfaces planes
+                          SpatialObject(wall_radius, glm::dvec3(box_center_x, anchor, box_size_z), glm::dvec3(0),
+                                        glm::dvec3(0.75, 0.75, 0.75),
+                                        SurfaceType::DIFFUSE), // plancher
+                          SpatialObject(wall_radius, glm::dvec3(box_center_x, -anchor + box_size_y, box_size_z),
+                                        glm::dvec3(0), glm::dvec3(0.75, 0.75, 0.75), SurfaceType::DIFFUSE), // plafond
+                          SpatialObject(wall_radius, glm::dvec3(anchor + 1, box_center_y, box_size_z), glm::dvec3(0),
+                                        glm::dvec3(0.75, 0.25, 0.25),
+                                        SurfaceType::DIFFUSE), // mur gauche
+                          SpatialObject(wall_radius, glm::dvec3(box_center_x, box_center_y, anchor), glm::dvec3(0),
+                                        glm::dvec3(0.25, 0.75, 0.25),
+                                        SurfaceType::DIFFUSE), // mur arrière
+                          SpatialObject(wall_radius, glm::dvec3(-anchor + 99, box_center_y, box_size_z), glm::dvec3(0),
+                                        glm::dvec3(0.25, 0.25, 0.75),
+                                        SurfaceType::DIFFUSE), // mur droit
+                          SpatialObject(wall_radius, glm::dvec3(box_center_x, box_center_y, -anchor + 170),
+                                        glm::dvec3(0), glm::dvec3(0.0, 0.0, 0.0),
+                                        SurfaceType::DIFFUSE), // mur avant
 
-                // ensemble des sphères situées à l'intérieur de la boîte de Cornell
-                SpatialObject(22.5, glm::vec3(30, 30, 40), glm::vec3(), glm::vec3(1.0, 1.0, 1.0),
-                              SurfaceType::SPECULAR), // sphère mirroir
-                SpatialObject(17.5, glm::vec3(75, 40, 75), glm::vec3(), glm::vec3(1.0, 1.0, 1.0),
-                              SurfaceType::REFRACTION), // sphère de verre
+                          // ensemble des sphères situées à l'intérieur de la boîte de Cornell
+                          SpatialObject(22.5, glm::dvec3(30, 30, 40), glm::dvec3(0), glm::dvec3(1.0, 1.0, 1.0),
+                                        SurfaceType::SPECULAR), // sphère mirroir
+                          SpatialObject(17.5, glm::dvec3(75, 40, 75), glm::dvec3(0), glm::dvec3(1.0, 1.0, 1.0),
+                                        SurfaceType::REFRACTION), // sphère de verre
 
-                SpatialObject(600, glm::vec3(box_center_x, 600.0 + box_size_z - 0.27, box_size_z),
-                              glm::vec3(15, 15, 15), glm::vec3(0.0, 0.0, 0.0), SurfaceType::DIFFUSE) // sphère lumineuse
-            });
+                          SpatialObject(600, glm::dvec3(box_center_x, 600.0 + box_size_z - 0.27, box_size_z),
+                                        glm::dvec3(15, 15, 15), glm::dvec3(0.0, 0.0, 0.0),
+                                        SurfaceType::DIFFUSE) // sphère lumineuse
+                      });
     }
 
     void render() noexcept
     {
         std::cout << "render start" << std::endl;
 
-        uint16_t index = 0;
-
+        uint32_t index = 0;
         float progression = 0.0f;
 
         float r1, r2 = 0.0f;
@@ -367,10 +402,10 @@ private:
                     for (uint8_t sx = 0u; sx < 2u; ++sx)
                     {
                         // initialiser la radiance
-                        radiance = glm::vec3{};
+                        radiance = Vector();
 
                         // itération des sur les rayons par pixel
-                        for (uint8_t s = 0u; s < _RAY_PER_PIXEL; ++s)
+                        for (uint16_t s = 0u; s < _RAY_PER_PIXEL; ++s)
                         {
                             // filtre de la tente
                             r1 = 2.0f * _random01(_rng);
@@ -386,58 +421,58 @@ private:
 
                             // appel récursif du calcul de la radiance
                             radiance =
-                                radiance + compute_radiance(
-                                               Ray(_camera.position + distance * 140.f, glm::normalize(distance)), 0u) *
-                                               (1.0f / _RAY_PER_PIXEL);
+                                radiance +
+                                compute_radiance(Ray(_camera.position + distance * 140.0, distance.normalize()), 0u) *
+                                    (1.0 / _RAY_PER_PIXEL);
                         }
 
                         _pixels[index] =
-                            _pixels[index] + glm::vec3(clamp(radiance.x), clamp(radiance.y), clamp(radiance.z)) * 0.25f;
-                    }
+                            _pixels[index] + Vector(clamp(radiance.x), clamp(radiance.y), clamp(radiance.z)) * 0.25;
                 }
             }
+        }
         }
 
         std::cout << "\nrender done" << std::endl;
     }
 
-    glm::vec3 compute_radiance(const Ray &ray, uint8_t depth)
+    Vector compute_radiance(const Ray &ray, uint8_t depth)
     {
         // valeur de la radiance
-        glm::vec3 radiance;
+        Vector radiance;
 
         // distance de l'intersection
-        float distance;
+        double distance;
 
         // identifiant de la géométrie en intersection
-        uint16_t id = 0;
+        uint32_t id = 0;
 
         // valider s'il n'y a pas intersection
         if (!raycast(ray, distance, id))
-            return glm::vec3{}; // couleur par défault (noir)
+            return Vector{}; // couleur par défault (noir)
 
         // référence sur une géométrie en intersection avec un rayon
         const SpatialObject &obj = _scene[id];
 
         // calculer les coordonnées du point d'intersection
-        glm::vec3 x = ray.origin + ray.direction * distance;
+        Vector x = ray.origin + ray.direction * distance;
 
         // calculer la normale au point d'intersection
-        glm::vec3 n = glm::normalize(glm::vec3(x - obj.position));
+        Vector n = Vector(x - Vector(obj.position)).normalize();
 
         // ajustement de la direction de la normale
-        glm::vec3 na = glm::dot(n, ray.direction) < 0.f ? n : n * -1.f;
+        Vector na = n.dot(ray.direction) < 0.f ? n : n * -1.0;
 
         // isoler la composante de couleur la plus puissante
-        glm::vec3 f = obj.colour;
-        float threshold = f.x > f.y && f.x > f.z ? f.x : f.y > f.z ? f.y : f.z;
+        Vector f = Vector(obj.colour.r, obj.colour.g, obj.colour.b);
+        double threshold = f.x > f.y && f.x > f.z ? f.x : f.y > f.z ? f.y : f.z;
 
         // valider si la limite du nombre de récursions est atteinte
         if (++depth > _MAX_DEPTH)
         {
             // test de probabilité
             if (_random01(_rng) < threshold)
-                f = f * glm::vec3(1 / threshold);
+                f = f * (1 / threshold);
             else
                 return obj.emission;
         }
@@ -446,17 +481,16 @@ private:
         {
             // matériau avec réflexion diffuse
 
-            float r1 = 2.f * M_PI * _random01(_rng);
-            float r2 = _random01(_rng);
-            float r2s = sqrt(r2);
+            double r1 = 2.f * M_PI * _random01(_rng);
+            double r2 = _random01(_rng);
+            double r2s = sqrt(r2);
 
-            glm::vec3 w = na;
-            glm::vec3 u = glm::normalize(glm::cross(fabs(w.x) > 0.1f ? glm::vec3(0, 1, 0) : glm::vec3(1), w));
-            glm::vec3 v = glm::cross(w, u);
-            glm::vec3 d =
-                glm::normalize(u * float(cos(r1)) * r2s + v * float(sin(r1)) * r2s + w * float(sqrt(1.f - r2)));
+            Vector w = na;
+            Vector u = ((fabs(w.x) > 0.1 ? Vector(0, 1) : Vector(1)).cross(w)).normalize();
+            Vector v = w.cross(u);
+            Vector d = (u * cos(r1) * r2s + v * sin(r1) * r2s + w * sqrt(1 - r2)).normalize();
 
-            radiance = obj.emission + f * compute_radiance(Ray(x, d), depth);
+            radiance = Vector(obj.emission) + f.multiply(compute_radiance(Ray(x, d), depth));
 
             return radiance;
         }
@@ -464,8 +498,8 @@ private:
         {
             // matériau avec réflexion spéculaire
 
-            radiance = obj.emission +
-                       f * compute_radiance(Ray(x, ray.direction - n * 2.f * glm::dot(n, ray.direction)), depth);
+            radiance = Vector(obj.emission) +
+                       f.multiply(compute_radiance(Ray(x, ray.direction - n * 2.0 * n.dot(ray.direction)), depth));
 
             return radiance;
         }
@@ -473,59 +507,56 @@ private:
         {
             // matériau avec réflexion réfraction
 
-            Ray reflection_ray(x, ray.direction - n * 2.f * glm::dot(n, ray.direction));
+            Ray reflection_ray(x, ray.direction - n * 2.0 * n.dot(ray.direction));
 
-            bool into = glm::dot(n, na) > 0;
+            bool into = n.dot(na) > 0;
 
-            float ior = 1.5f; // indice de réfraction du verre
-            float nc = 1.f;
-            float nt = ior;
-            float nnt = into ? nc / nt : nt / nc;
-            float ddn = glm::dot(ray.direction, na);
-            float cos2t;
+            double ior = 1.5; // indice de réfraction du verre
+            double nc = 1.0;
+            double nt = ior;
+            double nnt = into ? nc / nt : nt / nc;
+            double ddn = ray.direction.dot(na);
+            double cos2t;
 
-            if ((cos2t = 1.f - nnt * nnt * (1.f - ddn * ddn)) < 0.f)
+            if ((cos2t = 1.0 - nnt * nnt * (1.0 - ddn * ddn)) < 0.0)
             {
-                radiance = obj.emission + f * compute_radiance(reflection_ray, depth);
+                radiance = Vector(obj.emission) + f.multiply(compute_radiance(reflection_ray, depth));
 
                 return radiance;
             }
 
-            glm::vec3 tdir =
-                glm::normalize(ray.direction * nnt - n * float((into ? 1.f : -1.f) * (ddn * nnt + sqrt(cos2t))));
+            Vector tdir = (ray.direction * nnt - n * ((into ? 1.0 : -1.0) * (ddn * nnt + sqrt(cos2t)))).normalize();
 
             // effet de fresnel
-            float a = nt - nc;
-            float b = nt + nc;
-            float r0 = a * a / (b * b);
-            float c = 1.0 - (into ? -ddn : glm::dot(tdir, n));
-            float re = r0 + (1.0 - r0) * c * c * c * c * c;
-            float tr = 1 - re;
-            float p = 0.25 + 0.5 * re;
-            float rp = re / p;
-            float tp = tr / (1.0 - p);
+            double a = nt - nc;
+            double b = nt + nc;
+            double r0 = a * a / (b * b);
+            double c = 1.0 - (into ? -ddn : tdir.dot(n));
+            double re = r0 + (1.0 - r0) * c * c * c * c * c;
+            double tr = 1 - re;
+            double p = 0.25 + 0.5 * re;
+            double rp = re / p;
+            double tp = tr / (1.0 - p);
 
-            radiance =
-                obj.emission + f * (depth > 2u ? (_random01(_rng) < p ? compute_radiance(reflection_ray, depth) * rp :
-                                                                        compute_radiance(Ray(x, tdir), depth) * tp) :
-                                                 compute_radiance(reflection_ray, depth) * re +
-                                                     compute_radiance(Ray(x, tdir), depth) * tr);
+            radiance = Vector(obj.emission) +
+                       f.multiply(depth > 2 ? (_random01(_rng) < p ? compute_radiance(reflection_ray, depth) * rp :
+                                                                     compute_radiance(Ray(x, tdir), depth) * tp) :
+                                              compute_radiance(reflection_ray, depth) * re +
+                                                  compute_radiance(Ray(x, tdir), depth) * tr);
 
             return radiance;
         }
-        else
-        {
-            return radiance;
-        }
+
+        return radiance;
     }
 
-    bool raycast(const Ray &ray, float &distance, uint16_t &id)
+    bool raycast(const Ray &ray, double &distance, uint32_t &id)
     {
         // variable temporaire pour la distance d'une intersection entre un rayon et une sphère
-        float d;
+        double d;
 
         // initialiser la distance à une valeur suffisamment éloignée pour qu'on la considère comme l'infinie
-        float infinity = distance = 1e20;
+        double infinity = distance = std::numeric_limits<double>::max();
 
         // nombre d'éléments dans la scène
         uint32_t n = static_cast<uint32_t>(_scene.size());
@@ -546,10 +577,7 @@ private:
         }
 
         // il y a eu intersection si la distance est plus petite que l'infini
-        if (distance < infinity)
-            return true;
-        else
-            return false;
+        return (distance < infinity) ? true : false;
     }
 
     void post_render(sf::RenderWindow &window) noexcept
@@ -574,11 +602,11 @@ private:
 
 private:
     const uint8_t _MAX_DEPTH = 5u;
-    const float _CAMERA_FOV = 0.5135f; // ~30 degrés
-    const glm::vec3 _CAMERA_POSITION = glm::vec3(50, 50, 300);
-    const glm::vec3 _CAMERA_ORIENTATION = glm::normalize(glm::vec3(0, -0.042612, -1));
-    const glm::vec3 _BACKGROUND_COLOR = glm::vec3(0.0, 0.0, 0.0);
-    static constexpr float _GAMMA_CORRECTION = 1.f / 2.2f;
+    const double _CAMERA_FOV = 0.5135; // ~30 degrés
+    const Vector _CAMERA_POSITION = Vector(50, 50, 300);
+    const Vector _CAMERA_ORIENTATION = Vector(0, -0.042612, -1).normalize();
+    const Vector _BACKGROUND_COLOR = Vector(0.0, 0.0, 0.0);
+    static constexpr double _GAMMA_CORRECTION = 1.f / 2.2f;
 
     // variables du programme
     const uint16_t _IMAGE_WIDTH = 0u;
@@ -592,7 +620,7 @@ private:
     // framebuffer de SFML
     sf::Texture _texture;
     sf::Sprite _sprite;
-    std::vector<glm::vec3> _pixels;
+    std::vector<Vector> _pixels;
     std::vector<uint8_t> _image;
     Camera _camera;
 
@@ -603,5 +631,5 @@ private:
     std::mt19937 _rng{_rd()};
 
     // distribution uniforme entre 0 et 1
-    std::uniform_real_distribution<float> _random01{0.0, 1.0};
+    std::uniform_real_distribution<double> _random01{0.0, 1.0};
 };

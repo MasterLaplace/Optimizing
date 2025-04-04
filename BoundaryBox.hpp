@@ -82,12 +82,12 @@ struct SpatialObject {
     glm::vec3 size{};
     glm::vec4 colour{};
     SurfaceType material = SurfaceType::DIFFUSE;
-    glm::vec3 emission{};
+    glm::dvec3 emission{};
     float radius = 0.0f;
 
     SpatialObject() = default;
-    SpatialObject(double r, glm::vec3 p, glm::vec3 e, glm::vec3 c, SurfaceType m)
-        : radius(r), position(p), emission(e), colour(c.r, c.g, c.b, 255.f), material(m)
+    SpatialObject(double r, glm::vec3 p, glm::dvec3 e, glm::vec3 c, SurfaceType m)
+        : position(p), size(r), colour(c.r, c.g, c.b, 255.f), material(m), emission(e), radius(r)
     {
     }
 };
