@@ -83,11 +83,25 @@ struct SpatialObject {
     glm::vec4 colour{};
     SurfaceType material = SurfaceType::DIFFUSE;
     glm::dvec3 emission{};
-    float radius = 0.0f;
+    glm::dvec3 radius{};
+    enum class Type : uint8_t {
+        SPHERE,
+        PLANE,
+        CUBE
+    } type = Type::SPHERE;
+
+    [[nodiscard]] inline BoundaryBox getBoundingBox() const noexcept
+    {
+        return BoundaryBox(position, size);
+    }
+
+    [[nodiscard]] inline glm::vec3 getPosition() const noexcept { return position; }
+    [[nodiscard]] inline glm::vec3 getSize() const noexcept { return size; }
+    [[nodiscard]] inline glm::vec4 getColour() const noexcept { return colour; }
 
     SpatialObject() = default;
-    SpatialObject(double r, glm::vec3 p, glm::dvec3 e, glm::vec3 c, SurfaceType m)
-        : position(p), size(r), colour(c.r, c.g, c.b, 255.f), material(m), emission(e), radius(r)
+    SpatialObject(double r, glm::vec3 p, glm::dvec3 e, glm::vec3 c, SurfaceType m, Type t = Type::SPHERE) noexcept
+        : position(p), size(r), colour(c.r, c.g, c.b, 255.f), material(m), emission(e), radius(r), type(t)
     {
     }
 };

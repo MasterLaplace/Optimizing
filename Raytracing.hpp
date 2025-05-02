@@ -37,6 +37,8 @@
 #define _USE_MATH_DEFINES
 #include <cmath>
 
+#define DEBUG_RAYTRACING
+
 class Raytracing {
 public:
     struct CreateInfo {
@@ -79,6 +81,15 @@ private:
 
         // multiplication scalaire
         Vector operator*(double s) const { return Vector(x * s, y * s, z * s); }
+
+        // multiplication élément par élément (vectorielle)
+        Vector operator*(const Vector &v) const { return Vector(x * v.x, y * v.y, z * v.z); }
+
+        // division vectorielle
+        Vector operator/(const Vector &v) const { return Vector(x / v.x, y / v.y, z / v.z); }
+
+        // division scalaire
+        Vector operator/(double s) const { return Vector(x / s, y / s, z / s); }
 
         // addition vectorielle
         Vector operator+(const Vector &v) const { return Vector(x + v.x, y + v.y, z + v.z); }
@@ -147,9 +158,27 @@ public:
     {
         _pixels.reserve(_PIXEL_COUNT * 4u);
 
-        size_t nbObjects = 10;
+        constexpr double anchor = 1e5;
+        constexpr double wall_radius = anchor;
+
+        constexpr double box_size_x = 100.0;
+        constexpr double box_size_y = 81.6;
+        constexpr double box_size_z = 81.6;
+
+        constexpr double box_x_min = 0.0;
+        constexpr double box_x_max = box_size_x;
+        constexpr double box_y_min = 0.0;
+        constexpr double box_y_max = box_size_y;
+        constexpr double box_z_min = 0.0;
+        constexpr double box_z_max = box_size_z;
+
+        constexpr double box_center_x = (box_x_max - box_x_min) / 2.0;
+        constexpr double box_center_y = (box_y_max - box_y_min) / 2.0;
+        constexpr double box_center_z = (box_z_max - box_z_min) / 2.0;
+
+        size_t nbObjects = 1000;
         sf::Vector3f pos = {0, 0, 0};
-        sf::Vector3f size = {800, 600, 50};
+        sf::Vector3f size = {800, 600, 600};
         sf::Vector3f maxArea = pos + size;
         std::vector<SpatialObject> objects;
 
@@ -160,12 +189,22 @@ public:
             SpatialObject obj;
             obj.position = {randdouble(pos.x, maxArea.x), randdouble(pos.y, maxArea.y), randdouble(pos.z, maxArea.z)};
             obj.velocity = {randdouble(0, 10), randdouble(0, 10), randdouble(0, 10)};
-            obj.size = {randdouble(0, 20), randdouble(0, 20), randdouble(0, 20)};
+            obj.size = {randdouble(20, 200), randdouble(20, 200), randdouble(20, 200)};
             obj.colour = glm::vec4(rand() % 255, rand() % 255, rand() % 255, 255);
+            obj.emission = {randdouble(0, 15), randdouble(0, 15), randdouble(0, 15)};
             obj.material = static_cast<SurfaceType>(rand() % 3);
+            obj.radius = obj.size;
 
             objects.emplace_back(obj);
         }
+
+        objects.emplace_back(SpatialObject(22.5, glm::dvec3(30, 30, 40), glm::dvec3(0), glm::dvec3(1.0, 1.0, 1.0),
+                                           SurfaceType::SPECULAR)); // sphère mirroir
+        objects.emplace_back(SpatialObject(17.5, glm::dvec3(75, 40, 75), glm::dvec3(0), glm::dvec3(1.0, 1.0, 1.0),
+                                           SurfaceType::REFRACTION)); // sphère de verre
+
+        objects.emplace_back(SpatialObject(600, glm::dvec3(0, 0, 0), glm::dvec3(15, 15, 15), glm::dvec3(0.0, 0.0, 0.0),
+                                           SurfaceType::DIFFUSE)); // sphère lumineuse
 
         _worldPartition.insert(objects);
     }
@@ -208,44 +247,34 @@ private:
 
     [[nodiscard]] inline double intersect(const Ray &ray, const BoundaryBox &box) const noexcept
     {
-        // Initialiser les limites de l'intersection
-        double tMin = 0.0f;
-        double tMax = std::numeric_limits<double>::max();
+        double tmin = 0, tmax = std::numeric_limits<double>::infinity();
 
-        // Parcourir chaque axe (x, y, z)
-        for (uint8_t i = 0; i < 3u; ++i)
+        for (uint8_t i = 0; i < 3; ++i)
         {
-            // Inverser la direction du rayon pour éviter la division par zéro
-            double invD = 1.0f / ray.direction[i];
-            double t0 = (box.getMin()[i] - ray.origin[i]) * invD;
-            double t1 = (box.getMax()[i] - ray.origin[i]) * invD;
+            double origin = (&ray.origin.x)[i];
+            double dir = (&ray.direction.x)[i];
+            double invD = 1.0 / dir;
+            double t0 = ((&box.getMin().x)[i] - origin) * invD;
+            double t1 = ((&box.getMax().x)[i] - origin) * invD;
 
-            // Assurer que t0 est le plus petit et t1 le plus grand
-            if (invD < 0.0f)
+            if (invD < 0)
                 std::swap(t0, t1);
 
-            // Mettre à jour les limites de l'intersection
-            tMin = std::max(tMin, t0);
-            tMax = std::min(tMax, t1);
+            tmin = t0 > tmin ? t0 : tmin;
+            tmax = t1 < tmax ? t1 : tmax;
 
-            // Si les limites se croisent, il n'y a pas d'intersection
-            if (tMax <= tMin)
-                return 0.0f;
+            if (tmax <= tmin)
+                return 0.0;
         }
-
-        // Retourner la distance minimale de l'intersection
-        return tMin;
+        return tmin > 1e-4 ? tmin : 0.0;
     }
 
     [[nodiscard]] inline double intersect(const Ray &ray, const SpatialObject &object) const noexcept
     {
-#ifndef DEBUG_RAYTRACING
-        // Créer une boîte englobante pour l'objet
-        BoundaryBox box(object.position, object.size);
-
         // Calculer l'intersection entre le rayon et la boîte
-        return intersect(ray, box);
-#else
+        if (object.type == SpatialObject::Type::CUBE)
+            return intersect(ray, object.getBoundingBox());
+
         // distance de l'intersection la plus près si elle existe
         double distance;
 
@@ -265,7 +294,7 @@ private:
         double b = delta.dot(ray.direction);
 
         // calculer c
-        double c = object.radius * object.radius;
+        double c = object.radius.x * object.radius.y;
 
         // calculer le discriminant de l'équation quadratique
         double discriminant = b * b - a + c;
@@ -297,7 +326,6 @@ private:
 
         // retourner la distance du point d'intersection
         return distance;
-#endif
     }
 
     void init_cornell_box()
@@ -320,43 +348,51 @@ private:
         constexpr double box_center_y = (box_y_max - box_y_min) / 2.0;
         constexpr double box_center_z = (box_z_max - box_z_min) / 2.0;
 
+        Vector centre(50, 40, 75);
+        constexpr double half = 15.0;
+
         // vider la scène de son contenu
         _scene.clear();
 
         // génération du contenu de la scène
-        _scene.insert(_scene.begin(),
-                      {
+        _scene.insert(
+            _scene.begin(),
+            {
 
-                          // approximation d'une boîte de Cornell avec des sphères surdimensionnées qui simulent des
-                          // surfaces planes
-                          SpatialObject(wall_radius, glm::dvec3(box_center_x, anchor, box_size_z), glm::dvec3(0),
-                                        glm::dvec3(0.75, 0.75, 0.75),
-                                        SurfaceType::DIFFUSE), // plancher
-                          SpatialObject(wall_radius, glm::dvec3(box_center_x, -anchor + box_size_y, box_size_z),
-                                        glm::dvec3(0), glm::dvec3(0.75, 0.75, 0.75), SurfaceType::DIFFUSE), // plafond
-                          SpatialObject(wall_radius, glm::dvec3(anchor + 1, box_center_y, box_size_z), glm::dvec3(0),
-                                        glm::dvec3(0.75, 0.25, 0.25),
-                                        SurfaceType::DIFFUSE), // mur gauche
-                          SpatialObject(wall_radius, glm::dvec3(box_center_x, box_center_y, anchor), glm::dvec3(0),
-                                        glm::dvec3(0.25, 0.75, 0.25),
-                                        SurfaceType::DIFFUSE), // mur arrière
-                          SpatialObject(wall_radius, glm::dvec3(-anchor + 99, box_center_y, box_size_z), glm::dvec3(0),
-                                        glm::dvec3(0.25, 0.25, 0.75),
-                                        SurfaceType::DIFFUSE), // mur droit
-                          SpatialObject(wall_radius, glm::dvec3(box_center_x, box_center_y, -anchor + 170),
-                                        glm::dvec3(0), glm::dvec3(0.0, 0.0, 0.0),
-                                        SurfaceType::DIFFUSE), // mur avant
+                // approximation d'une boîte de Cornell avec des sphères surdimensionnées qui simulent des
+                // surfaces planes
+                SpatialObject(wall_radius, glm::dvec3(box_center_x, anchor, box_size_z), glm::dvec3(0.),
+                              glm::dvec3(0.75, 0.75, 0.75),
+                              SurfaceType::DIFFUSE), // plancher
+                SpatialObject(wall_radius, glm::dvec3(box_center_x, -anchor + box_size_y, box_size_z), glm::dvec3(0.),
+                              glm::dvec3(0.75, 0.75, 0.75), SurfaceType::DIFFUSE), // plafond
+                SpatialObject(wall_radius, glm::dvec3(anchor + 1, box_center_y, box_size_z), glm::dvec3(0.),
+                              glm::dvec3(0.75, 0.25, 0.25),
+                              SurfaceType::DIFFUSE), // mur gauche
+                SpatialObject(wall_radius, glm::dvec3(box_center_x, box_center_y, anchor), glm::dvec3(0.),
+                              glm::dvec3(0.25, 0.75, 0.25),
+                              SurfaceType::DIFFUSE), // mur arrière
+                SpatialObject(wall_radius, glm::dvec3(-anchor + 99, box_center_y, box_size_z), glm::dvec3(0.),
+                              glm::dvec3(0.25, 0.25, 0.75),
+                              SurfaceType::DIFFUSE), // mur droit
+                SpatialObject(wall_radius, glm::dvec3(box_center_x, box_center_y, -anchor + 170), glm::dvec3(0.),
+                              glm::dvec3(0.),
+                              SurfaceType::DIFFUSE), // mur avant
 
-                          // ensemble des sphères situées à l'intérieur de la boîte de Cornell
-                          SpatialObject(22.5, glm::dvec3(30, 30, 40), glm::dvec3(0), glm::dvec3(1.0, 1.0, 1.0),
-                                        SurfaceType::SPECULAR), // sphère mirroir
-                          SpatialObject(17.5, glm::dvec3(75, 40, 75), glm::dvec3(0), glm::dvec3(1.0, 1.0, 1.0),
-                                        SurfaceType::REFRACTION), // sphère de verre
+                // ensemble des sphères situées à l'intérieur de la boîte de Cornell
+                SpatialObject(22.5, glm::dvec3(30, 30, 40), glm::dvec3(0.), glm::dvec3(1.),
+                              SurfaceType::SPECULAR), // sphère mirroir
+                SpatialObject(17.5, glm::dvec3(75, 40, 75), glm::dvec3(0.), glm::dvec3(1.),
+                              SurfaceType::REFRACTION), // sphère de verre
 
-                          SpatialObject(600, glm::dvec3(box_center_x, 600.0 + box_size_z - 0.27, box_size_z),
-                                        glm::dvec3(15, 15, 15), glm::dvec3(0.0, 0.0, 0.0),
-                                        SurfaceType::DIFFUSE) // sphère lumineuse
-                      });
+                SpatialObject(600, glm::dvec3(box_center_x, 600.0 + box_size_z - 0.27, box_size_z),
+                              glm::dvec3(15, 15, 15), glm::dvec3(0.),
+                              SurfaceType::DIFFUSE), // sphère lumineuse
+
+                // ajoute un cube au milieu de la scène
+                SpatialObject(10, glm::dvec3(centre.x - half, centre.y - half, centre.z - half), glm::dvec3(0.),
+                              glm::dvec3(0.8, 0.8, 0.2), SurfaceType::DIFFUSE, SpatialObject::Type::CUBE),
+            });
     }
 
     void render() noexcept
@@ -364,14 +400,15 @@ private:
         std::cout << "render start" << std::endl;
 
         uint32_t index = 0;
+
         float progression = 0.0f;
 
-        float r1, r2 = 0.0f;
-        float dx, dy = 0.0f;
+        double r1, r2 = 0.0f;
+        double dx, dy = 0.0f;
 
-        glm::vec3 radiance;
+        Vector radiance;
 
-        glm::vec3 distance;
+        Vector distance;
 
 #ifndef DEBUG_RAYTRACING
         _scene.clear();
@@ -428,9 +465,9 @@ private:
 
                         _pixels[index] =
                             _pixels[index] + Vector(clamp(radiance.x), clamp(radiance.y), clamp(radiance.z)) * 0.25;
+                    }
                 }
             }
-        }
         }
 
         std::cout << "\nrender done" << std::endl;
@@ -438,9 +475,6 @@ private:
 
     Vector compute_radiance(const Ray &ray, uint8_t depth)
     {
-        // valeur de la radiance
-        Vector radiance;
-
         // distance de l'intersection
         double distance;
 
@@ -457,15 +491,42 @@ private:
         // calculer les coordonnées du point d'intersection
         Vector x = ray.origin + ray.direction * distance;
 
-        // calculer la normale au point d'intersection
-        Vector n = Vector(x - Vector(obj.position)).normalize();
+        // attributs de l'objet touché
+        Vector n;             // normale
+        Vector emission;      // emission
+        Vector colour;        // couleur
+        SurfaceType material; // type de surface
+
+        if (obj.type != SpatialObject::Type::CUBE)
+        {
+            n = (x - obj.position).normalize();
+            emission = obj.emission;
+            colour = Vector(obj.colour.r, obj.colour.g, obj.colour.b);
+            material = obj.material;
+        }
+        else
+        {
+            const BoundaryBox bb = obj.getBoundingBox();
+            // normale selon l'axe de la face impactée
+            Vector d = x - Vector(bb.getMin() + bb.getMax()) * 0.5;
+            double ax = fabs(d.x), ay = fabs(d.y), az = fabs(d.z);
+            if (ax > ay && ax > az)
+                n = Vector(d.x > 0 ? 1 : -1, 0, 0);
+            else if (ay > az)
+                n = Vector(0, d.y > 0 ? 1 : -1, 0);
+            else
+                n = Vector(0, 0, d.z > 0 ? 1 : -1);
+            emission = obj.emission;
+            colour = Vector(obj.colour.r, obj.colour.g, obj.colour.b);
+            material = obj.material;
+        }
 
         // ajustement de la direction de la normale
-        Vector na = n.dot(ray.direction) < 0.f ? n : n * -1.0;
+        Vector nl = n.dot(ray.direction) < 0 ? n : n * -1;
 
         // isoler la composante de couleur la plus puissante
         Vector f = Vector(obj.colour.r, obj.colour.g, obj.colour.b);
-        double threshold = f.x > f.y && f.x > f.z ? f.x : f.y > f.z ? f.y : f.z;
+        double threshold = std::max(f.x, std::max(f.y, f.z));
 
         // valider si la limite du nombre de récursions est atteinte
         if (++depth > _MAX_DEPTH)
@@ -485,23 +546,19 @@ private:
             double r2 = _random01(_rng);
             double r2s = sqrt(r2);
 
-            Vector w = na;
+            Vector w = nl;
             Vector u = ((fabs(w.x) > 0.1 ? Vector(0, 1) : Vector(1)).cross(w)).normalize();
             Vector v = w.cross(u);
             Vector d = (u * cos(r1) * r2s + v * sin(r1) * r2s + w * sqrt(1 - r2)).normalize();
 
-            radiance = Vector(obj.emission) + f.multiply(compute_radiance(Ray(x, d), depth));
-
-            return radiance;
+            return Vector(obj.emission) + f.multiply(compute_radiance(Ray(x, d), depth));
         }
         else if (obj.material == SurfaceType::SPECULAR)
         {
             // matériau avec réflexion spéculaire
 
-            radiance = Vector(obj.emission) +
-                       f.multiply(compute_radiance(Ray(x, ray.direction - n * 2.0 * n.dot(ray.direction)), depth));
-
-            return radiance;
+            Vector refl_dir = ray.direction - n * 2.0 * n.dot(ray.direction);
+            return emission + f.multiply(compute_radiance(Ray(x, refl_dir), depth));
         }
         else if (obj.material == SurfaceType::REFRACTION)
         {
@@ -509,20 +566,18 @@ private:
 
             Ray reflection_ray(x, ray.direction - n * 2.0 * n.dot(ray.direction));
 
-            bool into = n.dot(na) > 0;
+            bool into = n.dot(nl) > 0;
 
             double ior = 1.5; // indice de réfraction du verre
             double nc = 1.0;
             double nt = ior;
             double nnt = into ? nc / nt : nt / nc;
-            double ddn = ray.direction.dot(na);
+            double ddn = ray.direction.dot(nl);
             double cos2t;
 
             if ((cos2t = 1.0 - nnt * nnt * (1.0 - ddn * ddn)) < 0.0)
             {
-                radiance = Vector(obj.emission) + f.multiply(compute_radiance(reflection_ray, depth));
-
-                return radiance;
+                return Vector(obj.emission) + f.multiply(compute_radiance(reflection_ray, depth));
             }
 
             Vector tdir = (ray.direction * nnt - n * ((into ? 1.0 : -1.0) * (ddn * nnt + sqrt(cos2t)))).normalize();
@@ -530,24 +585,31 @@ private:
             // effet de fresnel
             double a = nt - nc;
             double b = nt + nc;
-            double r0 = a * a / (b * b);
+            double R0 = a * a / (b * b);
             double c = 1.0 - (into ? -ddn : tdir.dot(n));
-            double re = r0 + (1.0 - r0) * c * c * c * c * c;
-            double tr = 1 - re;
-            double p = 0.25 + 0.5 * re;
-            double rp = re / p;
-            double tp = tr / (1.0 - p);
+            double Re = R0 + (1.0 - R0) * c * c * c * c * c;
+            double Tr = 1 - Re;
+            double P = 0.25 + 0.5 * Re;
+            double RP = Re / P;
+            double TP = Tr / (1.0 - P);
 
-            radiance = Vector(obj.emission) +
-                       f.multiply(depth > 2 ? (_random01(_rng) < p ? compute_radiance(reflection_ray, depth) * rp :
-                                                                     compute_radiance(Ray(x, tdir), depth) * tp) :
-                                              compute_radiance(reflection_ray, depth) * re +
-                                                  compute_radiance(Ray(x, tdir), depth) * tr);
+            if (depth > 2)
+            {
+                if (_random01(_rng) < P)
+                {
+                    return emission + f.multiply(compute_radiance(reflection_ray, depth) * RP);
+                }
+                else
+                {
+                    return emission + f.multiply(compute_radiance(Ray(x, tdir), depth) * TP);
+                }
+            }
 
-            return radiance;
+            return emission + f.multiply(compute_radiance(reflection_ray, depth) * Re +
+                                         compute_radiance(Ray(x, tdir), depth) * Tr);
         }
 
-        return radiance;
+        return Vector();
     }
 
     bool raycast(const Ray &ray, double &distance, uint32_t &id)
@@ -556,7 +618,8 @@ private:
         double d;
 
         // initialiser la distance à une valeur suffisamment éloignée pour qu'on la considère comme l'infinie
-        double infinity = distance = std::numeric_limits<double>::max();
+        distance = std::numeric_limits<double>::max();
+        double infinity = distance;
 
         // nombre d'éléments dans la scène
         uint32_t n = static_cast<uint32_t>(_scene.size());
@@ -577,7 +640,7 @@ private:
         }
 
         // il y a eu intersection si la distance est plus petite que l'infini
-        return (distance < infinity) ? true : false;
+        return distance < infinity;
     }
 
     void post_render(sf::RenderWindow &window) noexcept
