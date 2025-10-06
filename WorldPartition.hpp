@@ -28,6 +28,7 @@
 #include "ThreadPool.hpp"
 #include <chrono>
 #include <fstream>
+#include <functional>
 #include <iostream>
 #include <limits>
 #include <random>
@@ -40,8 +41,8 @@
 #endif
 
 namespace std {
-template <> struct hash<sf::Vector2i> {
-    std::size_t operator()(const sf::Vector2i &v) const noexcept
+template <> struct hash<glm::ivec2> {
+    std::size_t operator()(const glm::ivec2 &v) const noexcept
     {
         return std::hash<int>()(v.x) ^ (std::hash<int>()(v.y) << 1);
     }
@@ -83,7 +84,7 @@ public:
         for (const auto &obj : _objects)
             _octree.insert(obj, BoundaryBox(obj.position, obj.size));
 
-        std::cout << "Cellule " << _pos.x << " " << _pos.y << " chargée." << std::endl;
+        std::cout << "Cellule " << _pos.x << " " << _pos.z << " chargée." << std::endl;
     }
 
     void unload_data()
@@ -93,7 +94,7 @@ public:
 
         _loaded = false;
         _octree.clear();
-        std::cout << "Cellule " << _pos.x << " " << _pos.y << " déchargée." << std::endl;
+        std::cout << "Cellule " << _pos.x << " " << _pos.z << " déchargée." << std::endl;
     }
 
     void draw(sf::RenderWindow &window, const glm::vec3 &player_pos)
@@ -101,23 +102,23 @@ public:
         if (!_loaded || _objects.empty())
             return;
 
-        glm::vec3 size{50, 50, std::numeric_limits<float>::max()};
+        glm::vec3 size{50, 10, 50};
         BoundaryBox boundaryBox(size * -0.5f + player_pos, size);
 
         DEBUG_LINE(auto start = std::chrono::high_resolution_clock::now());
         for (const auto &obj : _octree.search(boundaryBox))
         {
             sf::RectangleShape rect;
-            rect.setPosition({obj->item.position.x, obj->item.position.y});
-            rect.setSize({obj->item.size.x, obj->item.size.y});
+            rect.setPosition({obj->item.position.x, obj->item.position.z});
+            rect.setSize({obj->item.size.x, obj->item.size.z});
             rect.setFillColor(sf::Color(obj->item.colour.r, obj->item.colour.g, obj->item.colour.b, obj->item.colour.a));
             window.draw(rect);
             DEBUG_LINE(++_objCount);
         }
 
         sf::RectangleShape rect;
-        rect.setPosition({_pos.x, _pos.y});
-        rect.setSize({_size.x, _size.y});
+        rect.setPosition({_pos.x, _pos.z});
+        rect.setSize({_size.x, _size.z});
         rect.setFillColor(sf::Color::Transparent);
         rect.setOutlineColor(sf::Color::White);
         rect.setOutlineThickness(1);
@@ -170,43 +171,40 @@ public:
         std::lock_guard<std::mutex> lock(_mutex);
         for (const auto &obj : _objects)
         {
-            sf::Vector2i grid = {static_cast<int>(obj.position.x / _size.x), static_cast<int>(obj.position.y / _size.y)};
+            glm::ivec2 grid = {static_cast<int>(obj.position.x / _size.x), static_cast<int>(obj.position.z / _size.z)};
 
             if (_cells.find(grid) == _cells.end())
-                _cells[grid] = std::make_shared<Partition>(glm::vec3(grid.x * _size.x, grid.y * _size.y, 0), _size);
+                _cells[grid] = std::make_shared<Partition>(glm::vec3(grid.x * _size.x, 0, grid.y * _size.z), _size);
 
             _cells[grid]->insert(obj);
         }
     }
 
-    void load_partition(sf::Vector2i grid)
+    void load_partition(glm::ivec2 grid)
     {
         std::lock_guard<std::mutex> lock(_mutex);
         if (_cells.find(grid) == _cells.end())
-            _cells[grid] = std::make_shared<Partition>(glm::vec3(grid.x * _size.x, grid.y * _size.y, 0), _size);
+            _cells[grid] = std::make_shared<Partition>(glm::vec3(grid.x * _size.x, 0, grid.y * _size.z), _size);
 
         _threadPool.enqueue(&Partition::load_data, _cells[grid]);
     }
 
-    void unload_partition(const std::pair<sf::Vector2i, std::shared_ptr<Partition>> &cell)
-    {
-        cell.second->unload_data();
-    }
+    void unload_partition(const std::pair<glm::ivec2, std::shared_ptr<Partition>> &cell) { cell.second->unload_data(); }
 
-    void update(sf::RectangleShape player_rect)
+    void update(glm::vec3 player_pos)
     {
-        sf::Vector2i player_grid = {static_cast<int>(player_rect.getPosition().x / _size.x),
-                                    static_cast<int>(player_rect.getPosition().y / _size.y)};
+        glm::ivec2 player_grid = {static_cast<int>(player_pos.x / _size.x), static_cast<int>(player_pos.z / _size.z)};
 
         for (int x = player_grid.x - 1; x <= player_grid.x + 1; ++x)
         {
-            for (int y = player_grid.y - 1; y <= player_grid.y + 1; ++y)
+            for (int z = player_grid.y - 1; z <= player_grid.y + 1; ++z)
             {
-                load_partition({x, y});
+                load_partition({x, z});
             }
         }
 
         std::lock_guard<std::mutex> lock(_mutex);
+
         for (const auto &cell : _cells)
         {
             if (abs(cell.first.x - player_grid.x) > 1 || abs(cell.first.y - player_grid.y) > 1)
@@ -214,12 +212,13 @@ public:
         }
     }
 
-    void draw(sf::RenderWindow &window, const sf::Vector2f &player_pos)
+    void draw(sf::RenderWindow &window, const glm::vec3 &player_pos)
     {
         std::lock_guard<std::mutex> lock(_mutex);
+
         for (const auto &cell : _cells)
         {
-            cell.second->draw(window, {player_pos.x, player_pos.y, 0});
+            cell.second->draw(window, player_pos);
         }
     }
 
@@ -231,9 +230,15 @@ public:
             cell.second->getObjects(objects);
     }
 
+    template <typename Func, typename... Args>
+    inline void enqueueTask(Func &&func, Args &&...args)
+    {
+        _threadPool.enqueue(std::forward<Func>(func), std::forward<Args>(args)...);
+    }
+
 private:
-    glm::vec3 _size = {255, 255, std::numeric_limits<float>::max()};
-    std::unordered_map<sf::Vector2i, std::shared_ptr<Partition>> _cells;
+    glm::vec3 _size = {255, std::numeric_limits<float>::max(), 255};
+    std::unordered_map<glm::ivec2, std::shared_ptr<Partition>> _cells;
     std::mutex _mutex;
     ThreadPool _threadPool;
 };

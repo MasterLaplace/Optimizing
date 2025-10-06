@@ -76,6 +76,16 @@ enum class SurfaceType : uint8_t {
     REFRACTION
 };
 
+/**
+ * @brief Structure to represent a 3D object in the scene
+ *
+ * @param radius or size depending of the type
+ * @param position 3D position of the object
+ * @param emission 3D emission of the object
+ * @param colour 3D colour of the object
+ * @param material Surface type of the object
+ * @param type Type of the object (sphere or cube)
+ */
 struct SpatialObject {
     glm::vec3 position{};
     glm::vec3 velocity{};
@@ -86,7 +96,6 @@ struct SpatialObject {
     glm::dvec3 radius{};
     enum class Type : uint8_t {
         SPHERE,
-        PLANE,
         CUBE
     } type = Type::SPHERE;
 
@@ -100,6 +109,16 @@ struct SpatialObject {
     [[nodiscard]] inline glm::vec4 getColour() const noexcept { return colour; }
 
     SpatialObject() = default;
+    /**
+     * @brief Construct a new Spatial Object object
+     *
+     * @param r  radius or size depending of the type
+     * @param p  position
+     * @param e  emission
+     * @param c  colour
+     * @param m  material
+     * @param t  type
+     */
     SpatialObject(double r, glm::vec3 p, glm::dvec3 e, glm::vec3 c, SurfaceType m, Type t = Type::SPHERE) noexcept
         : position(p), size(r), colour(c.r, c.g, c.b, 255.f), material(m), emission(e), radius(r), type(t)
     {

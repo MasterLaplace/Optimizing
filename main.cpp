@@ -1,4 +1,4 @@
-#define RAYTRACING
+// #define RAYTRACING
 #ifndef RAYTRACING
 #    include "WorldPartition.hpp"
 #else
@@ -14,9 +14,9 @@ int main()
     WorldPartition worldPartition;
 
     size_t nbObjects = 100000;
-    sf::Vector3f pos = {0, 0, 0};
-    sf::Vector3f size = {800, 600, 50};
-    sf::Vector3f maxArea = pos + size;
+    glm::vec3 pos = {0, 0, 0};
+    glm::vec3 size = {800, 50, 600};
+    glm::vec3 maxArea = pos + size;
     std::vector<SpatialObject> objects;
 
     objects.reserve(nbObjects);
@@ -27,7 +27,7 @@ int main()
         obj.position = {randfloat(pos.x, maxArea.x), randfloat(pos.y, maxArea.y), randfloat(pos.z, maxArea.z)};
         obj.velocity = {randfloat(0, 10), randfloat(0, 10), randfloat(0, 10)};
         obj.size = {randfloat(0, 10), randfloat(0, 10), randfloat(0, 10)};
-        obj.colour = sf::Color(rand() % 255, rand() % 255, rand() % 255, 255);
+        obj.colour = glm::vec4(rand() % 255, rand() % 255, rand() % 255, 255);
 
         objects.emplace_back(obj);
     }
@@ -40,14 +40,15 @@ int main()
     createInfo.background_color = {0, 0, 0};
     createInfo.fov = 0.5135f; // ~30 degrés
     createInfo.depth = 5u;
-    createInfo.width = 800;
-    createInfo.height = 600;
+    createInfo.width = 256;
+    createInfo.height = 256;
     createInfo.ray_per_pixel = 16;
     Raytracing raytracing(createInfo);
 #endif
 
     sf::RectangleShape player_rect({10, 10});
     player_rect.setFillColor(sf::Color::Red);
+    float player_height = 0.0f;
 
     sf::Clock clock;
     while (window.isOpen())
@@ -69,14 +70,22 @@ int main()
             player_rect.move(0, -500 * deltaTime);
         if (sf::Keyboard::isKeyPressed(sf::Keyboard::Down))
             player_rect.move(0, 500 * deltaTime);
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Z))
+            player_height += 50 * deltaTime;
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::S))
+            player_height -= 50 * deltaTime;
+
+        player_height = std::clamp(player_height, 0.0f, size.y);
 
         window.clear();
 
 #ifndef RAYTRACING
-        worldPartition.update(player_rect);
-        worldPartition.draw(window, player_rect.getPosition());
+        pos = glm::vec3({player_rect.getPosition().x, player_height, player_rect.getPosition().y});
+        worldPartition.update(pos);
+        worldPartition.draw(window, pos);
 #else
-        raytracing.update(window);
+        const sf::Vector2f &pos = player_rect.getPosition();
+        raytracing.update(window, glm::vec3(pos.x, player_height, pos.y));
 #endif
 
         window.draw(player_rect);
