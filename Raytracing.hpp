@@ -57,6 +57,19 @@ public:
             scene_pos_min; // Will be replaced by the current position of the camera - the world partition's cell * 0.5f
         glm::dvec3 scene_scene_max; // Will be replaced by the current position of the camera + the world partition's
                                     // cell * 0.5f
+
+        friend std::ostream &operator<<(std::ostream &os, const CreateInfo &info)
+        {
+            os << "Position: (" << info.position.x << ", " << info.position.y << ", " << info.position.z << ")\n"
+                << "Direction: (" << info.direction.x << ", " << info.direction.y << ", " << info.direction.z << ")\n"
+                << "Background Color: (" << info.background_color.x << ", " << info.background_color.y << ", " << info.background_color.z << ")\n"
+                << "FOV: " << info.fov << "\n"
+                << "Depth: " << static_cast<int>(info.depth) << "\n"
+                << "Width: " << info.width << "\n"
+                << "Height: " << info.height << "\n"
+                << "Rays Per Pixel: " << info.ray_per_pixel;
+            return os;
+        }
     };
 
 private:
@@ -157,7 +170,11 @@ public:
           _camera(params.position, params.direction, params.height, params.width, params.fov)
     {
         _pixels.reserve(_PIXEL_COUNT * 4u);
+        _pixels.resize(_PIXEL_COUNT * 4u, 0u);
 
+        std::cout << params << std::endl;
+
+#ifndef DEBUG_RAYTRACING
         constexpr double anchor = 1e5;
         constexpr double wall_radius = anchor;
 
@@ -176,9 +193,9 @@ public:
         constexpr double box_center_y = (box_y_max - box_y_min) / 2.0;
         constexpr double box_center_z = (box_z_max - box_z_min) / 2.0;
 
-        size_t nbObjects = 1000;
+        size_t nbObjects = 100000;
         sf::Vector3f pos = {0, 0, 0};
-        sf::Vector3f size = {800, 600, 600};
+        sf::Vector3f size = {800, 500, 600};
         sf::Vector3f maxArea = pos + size;
         std::vector<SpatialObject> objects;
 
@@ -194,6 +211,7 @@ public:
             obj.emission = {randdouble(0, 15), randdouble(0, 15), randdouble(0, 15)};
             obj.material = static_cast<SurfaceType>(rand() % 3);
             obj.radius = obj.size;
+            obj.type = static_cast<SpatialObject::Type>(rand() % 2);
 
             objects.emplace_back(obj);
         }
@@ -207,9 +225,10 @@ public:
                                            SurfaceType::DIFFUSE)); // sphère lumineuse
 
         _worldPartition.insert(objects);
+#endif
     }
 
-    inline void update(sf::RenderWindow &window) noexcept
+    inline void update(sf::RenderWindow &window, glm::vec3 player_pos) noexcept
     {
         // faire un rendu de la scène par lancer de rayons
         auto start = std::chrono::high_resolution_clock::now();
@@ -276,13 +295,13 @@ private:
             return intersect(ray, object.getBoundingBox());
 
         // distance de l'intersection la plus près si elle existe
-        double distance;
+        double distance = 0.0;
 
         // seuil de tolérance numérique du test d'intersection
         double epsilon = 1e-4f;
 
         // distance du point d'intersection
-        double t;
+        double t = 0.0;
 
         // vecteur entre le centre de la sphère et l'origine du rayon
         Vector delta = Vector(object.position) - ray.origin;
@@ -362,10 +381,10 @@ private:
                 // approximation d'une boîte de Cornell avec des sphères surdimensionnées qui simulent des
                 // surfaces planes
                 SpatialObject(wall_radius, glm::dvec3(box_center_x, anchor, box_size_z), glm::dvec3(0.),
-                              glm::dvec3(0.75, 0.75, 0.75),
+                              glm::dvec3(0.75),
                               SurfaceType::DIFFUSE), // plancher
                 SpatialObject(wall_radius, glm::dvec3(box_center_x, -anchor + box_size_y, box_size_z), glm::dvec3(0.),
-                              glm::dvec3(0.75, 0.75, 0.75), SurfaceType::DIFFUSE), // plafond
+                              glm::dvec3(0.75), SurfaceType::DIFFUSE), // plafond
                 SpatialObject(wall_radius, glm::dvec3(anchor + 1, box_center_y, box_size_z), glm::dvec3(0.),
                               glm::dvec3(0.75, 0.25, 0.25),
                               SurfaceType::DIFFUSE), // mur gauche
@@ -373,7 +392,7 @@ private:
                               glm::dvec3(0.25, 0.75, 0.25),
                               SurfaceType::DIFFUSE), // mur arrière
                 SpatialObject(wall_radius, glm::dvec3(-anchor + 99, box_center_y, box_size_z), glm::dvec3(0.),
-                              glm::dvec3(0.25, 0.25, 0.75),
+                              glm::dvec3(0.25),
                               SurfaceType::DIFFUSE), // mur droit
                 SpatialObject(wall_radius, glm::dvec3(box_center_x, box_center_y, -anchor + 170), glm::dvec3(0.),
                               glm::dvec3(0.),
@@ -398,6 +417,12 @@ private:
     void render() noexcept
     {
         std::cout << "render start" << std::endl;
+
+        for (auto &obj : _scene)
+        {
+            std::cout << "object : " << obj.position.x << ", " << obj.position.y << ", "
+                      << obj.position.z << std::endl;
+        }
 
         uint32_t index = 0;
 
@@ -476,7 +501,7 @@ private:
     Vector compute_radiance(const Ray &ray, uint8_t depth)
     {
         // distance de l'intersection
-        double distance;
+        double distance = 0.0;
 
         // identifiant de la géométrie en intersection
         uint32_t id = 0;
@@ -615,7 +640,7 @@ private:
     bool raycast(const Ray &ray, double &distance, uint32_t &id)
     {
         // variable temporaire pour la distance d'une intersection entre un rayon et une sphère
-        double d;
+        double d = 0.0;
 
         // initialiser la distance à une valeur suffisamment éloignée pour qu'on la considère comme l'infinie
         distance = std::numeric_limits<double>::max();
