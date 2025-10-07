@@ -139,6 +139,46 @@ public:
             return _nodes[i]->insert(item, itemsize);
         }
 
+        // Check if item is too big to fit in any sub-node and capacity is exceeded
+        if (_DEPTH > 0 && _pItems.size() >= _CAPACITY)
+        {
+            bool itemFitsInSubNode = false;
+            for (uint8_t i = 0; i < 8u; ++i)
+            {
+                if (_rNodes[i].contains(itemsize))
+                {
+                    itemFitsInSubNode = true;
+                    break;
+                }
+            }
+
+            // If the new item doesn't fit in any sub-node, try to move an existing item that does
+            if (!itemFitsInSubNode)
+            {
+                for (auto it = _pItems.begin(); it != _pItems.end(); ++it)
+                {
+                    for (uint8_t i = 0; i < 8u; ++i)
+                    {
+                        if (_rNodes[i].contains(it->first))
+                        {
+                            // Found an item that can fit in a sub-node
+                            auto itemToMove = *it;
+                            _pItems.erase(it);
+
+                            if (!_nodes[i])
+                                _nodes[i] = std::make_unique<DynamicOctree<OBJ_TYPE>>(_rNodes[i], _CAPACITY, _DEPTH - 1);
+
+                            _nodes[i]->insert(itemToMove.second, itemToMove.first);
+
+                            // Now add the big item to current level
+                            _pItems.emplace_back(itemsize, item);
+                            return {&_pItems, std::prev(_pItems.end())};
+                        }
+                    }
+                }
+            }
+        }
+
         _pItems.emplace_back(itemsize, item);
         return {&_pItems, std::prev(_pItems.end())};
     }
