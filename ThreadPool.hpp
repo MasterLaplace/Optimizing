@@ -4,6 +4,7 @@
 #include <mutex>
 #include <queue>
 #include <thread>
+#include <functional>
 
 class ThreadPool {
 public:
