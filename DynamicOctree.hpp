@@ -65,6 +65,13 @@ private:
     };
 
 public:
+    /**
+     * @brief Construct a new Dynamic Octree object
+     *
+     * @param boundary  The 3D boundary box defining the octree's spatial limits.
+     * @param capacity  The maximum number of objects a node can hold before it splits.
+     * @param depth  The maximum depth of the octree.
+     */
     DynamicOctree(const BoundaryBox &boundary, const uint8_t capacity = MAX_CAPACITY,
                   const uint8_t depth = MAX_DEPTH) noexcept
         : _boundary(boundary), _DEPTH(depth), _CAPACITY(capacity)
@@ -73,6 +80,11 @@ public:
     }
     ~DynamicOctree() = default;
 
+    /**
+     * @brief Resize the octree to a new boundary area.
+     *
+     * @param rArea  The new boundary area for the octree.
+     */
     inline void resize(const BoundaryBox &rArea) noexcept
     {
         if (_boundary == rArea)
@@ -94,6 +106,10 @@ public:
         _rNodes[static_cast<size_t>(INDEX::NEU)] = BoundaryBox(pos + size, size);
     }
 
+    /**
+     * @brief Clear the octree and release all resources.
+     *
+     */
     inline void clear() noexcept
     {
         _pItems.clear();
@@ -110,6 +126,12 @@ public:
         _boundary = BoundaryBox();
     }
 
+    /**
+     * @brief Get the number of items in the octree.
+     *
+     * @return size_t  The number of items in the octree.
+     * @deprecated Use DynamicOctreeContainer::size() instead.
+     */
     [[nodiscard, deprecated("Use DynamicOctreeContainer::size() instead.")]] inline size_t size() const noexcept
     {
         size_t size = _pItems.size();
@@ -123,13 +145,20 @@ public:
         return size;
     }
 
+    /**
+     * @brief Insert an object into the octree.
+     *
+     * @param item  The object to insert.
+     * @param itemsize  The boundary box of the object.
+     * @return OctreeItemLocation<OBJ_TYPE>  The location of the inserted object in the octree.
+     */
     [[nodiscard]] OctreeItemLocation<OBJ_TYPE> insert(const OBJ_TYPE &item, const BoundaryBox &itemsize) noexcept
     {
         /// Check if item can be inserted in this node cause capacity is not exceeded or depth is 0
         if (_DEPTH == 0 || _pItems.size() < _CAPACITY)
             goto insert_here;
 
-        // Try to insert the item into a sub-node cause capacity is exceeded
+        // Try to insert the item into a sub-node because capacity is exceeded
         for (uint8_t i = 0; i < 8u; ++i)
         {
             if (!_rNodes[i].contains(itemsize))
@@ -141,8 +170,7 @@ public:
             return _nodes[i]->insert(item, itemsize);
         }
 
-        // If the new item doesn't fit in any sub-node and capacity is exceeded, try to move an existing item that does
-        for (auto it = _pItems.begin(); it != _pItems.end(); ++it)
+        // If the new item doesn't fit in any sub-node and capacity is exceeded, try to move an existing item that does.
         {
             for (uint8_t i = 0; i < 8u; ++i)
             {
@@ -168,6 +196,12 @@ public:
         return {&_pItems, std::prev(_pItems.end())};
     }
 
+    /**
+     * @brief Search for objects within a specific boundary area.
+     *
+     * @param rArea  The boundary area to search within.
+     * @return std::list<OBJ_TYPE>  A list of objects found within the area.
+     */
     [[nodiscard]] inline std::list<OBJ_TYPE> search(const BoundaryBox &rArea) const noexcept
     {
         std::list<OBJ_TYPE> listItems;
@@ -175,6 +209,12 @@ public:
         return listItems;
     }
 
+    /**
+     * @brief Search for objects within a specific boundary area and add them to a provided list.
+     *
+     * @param rArea  The boundary area to search within.
+     * @param listItems  The list to which found objects will be added.
+     */
     inline void search(const BoundaryBox &rArea, std::list<OBJ_TYPE> &listItems) const noexcept
     {
         for (const auto &[rItem, item] : _pItems)
@@ -195,6 +235,11 @@ public:
         }
     }
 
+    /**
+     * @brief Retrieve all items stored in the octree and add them to a provided list.
+     *
+     * @param listItems  The list to which all items will be added.
+     */
     inline void items(std::list<OBJ_TYPE> &listItems) const noexcept
     {
         for (const auto &[rItem, item] : _pItems)
@@ -207,8 +252,19 @@ public:
         }
     }
 
+    /**
+     * @brief Get the boundary box of the octree.
+     *
+     * @return const BoundaryBox&  The boundary box of the octree.
+     */
     [[nodiscard]] inline const BoundaryBox &boundary() const noexcept { return _boundary; }
 
+    /**
+     * @brief Remove an object from the octree.
+     *
+     * @param pItem  The object to remove.
+     * @return true if the object was removed, false otherwise.
+     */
     [[nodiscard]] inline bool remove(OBJ_TYPE pItem) noexcept
     {
         auto it = std::find_if(_pItems.begin(), _pItems.end(),
