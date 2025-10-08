@@ -42,6 +42,8 @@
 #include <list>
 #include <memory>
 #include <vector>
+#include <cassert>
+#include <iostream>
 
 template <typename OBJ_TYPE> struct OctreeItemLocation {
     typename std::list<std::pair<BoundaryBox, OBJ_TYPE>> *container;
@@ -154,10 +156,11 @@ public:
      */
     [[nodiscard]] OctreeItemLocation<OBJ_TYPE> insert(const OBJ_TYPE &item, const BoundaryBox &itemsize) noexcept
     {
-        /// Check if item can be inserted in this node cause capacity is not exceeded or depth is 0
+        // If we're at max depth or there is still capacity, insert here immediately.
         if (_DEPTH == 0 || _pItems.size() < _CAPACITY)
             goto insert_here;
 
+        // std::cout << "At capacity with size " << _pItems.size() << " at depth " << static_cast<int>(_DEPTH) << ".\n";
         // Try to insert the item into a sub-node because capacity is exceeded
         for (uint8_t i = 0; i < 8u; ++i)
         {
@@ -170,7 +173,9 @@ public:
             return _nodes[i]->insert(item, itemsize);
         }
 
+        // std::cout << "Item does not fit in any sub-node at depth " << static_cast<int>(_DEPTH) << ".\n";
         // If the new item doesn't fit in any sub-node and capacity is exceeded, try to move an existing item that does.
+        for (auto it = _pItems.begin(); it != _pItems.end(); ++it)
         {
             for (uint8_t i = 0; i < 8u; ++i)
             {
@@ -187,11 +192,36 @@ public:
                 _nodes[i]->insert(itemToMove.second, itemToMove.first);
 
                 // Now add the big item to current level
+
+                // Capture external iterator before moving
+//                 auto externalIt = it->second;
+
+// #ifndef NDEBUG
+//                 // Sanity check: the external OctreeItem should currently point to this node's _pItems
+//                 // as its container. If this fails, we have a logic bug upstream.
+//                 assert(externalIt->pItem.container == &_pItems && "external iterator container mismatch before splice");
+// #endif
+
+//                 // Splice element into child
+//                 _nodes[i]->_pItems.splice(_nodes[i]->_pItems.end(), _pItems, it);
+
+//                 // Update external location
+//                 auto movedIt = std::prev(_nodes[i]->_pItems.end());
+//                 externalIt->pItem.container = &(_nodes[i]->_pItems);
+//                 externalIt->pItem.iterator = movedIt;
+
+// #ifndef NDEBUG
+//                 // Sanity check: after update, the stored iterator should dereference to a pair whose second
+//                 // matches the external iterator value.
+//                 assert(externalIt->pItem.container == &(_nodes[i]->_pItems));
+// #endif
+                std::cout << "Moved item to sub-node during insert of large item.\n";
                 goto insert_here;
             }
         }
 
     insert_here:
+        // std::cout << "Inserted item at depth " << static_cast<int>(_DEPTH) << " with current size " << _pItems.size() << ".\n";
         _pItems.emplace_back(itemsize, item);
         return {&_pItems, std::prev(_pItems.end())};
     }
