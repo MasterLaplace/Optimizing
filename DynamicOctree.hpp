@@ -123,14 +123,16 @@ public:
         return size;
     }
 
-    [[nodiscard]] inline OctreeItemLocation<OBJ_TYPE> insert(const OBJ_TYPE &item, const BoundaryBox &itemsize) noexcept
+    [[nodiscard]] OctreeItemLocation<OBJ_TYPE> insert(const OBJ_TYPE &item, const BoundaryBox &itemsize) noexcept
     {
+        /// Check if item can be inserted in this node cause capacity is not exceeded or depth is 0
+        if (_DEPTH == 0 || _pItems.size() < _CAPACITY)
+            goto insert_here;
+
+        // Try to insert the item into a sub-node cause capacity is exceeded
         for (uint8_t i = 0; i < 8u; ++i)
         {
-            if (_DEPTH == 0 || _pItems.size() < _CAPACITY)
-                break;
-
-            else if (!_rNodes[i].contains(itemsize))
+            if (!_rNodes[i].contains(itemsize))
                 continue;
 
             if (!_nodes[i])
@@ -139,46 +141,29 @@ public:
             return _nodes[i]->insert(item, itemsize);
         }
 
-        // Check if item is too big to fit in any sub-node and capacity is exceeded
-        if (_DEPTH > 0 && _pItems.size() >= _CAPACITY)
+        // If the new item doesn't fit in any sub-node and capacity is exceeded, try to move an existing item that does
+        for (auto it = _pItems.begin(); it != _pItems.end(); ++it)
         {
-            bool itemFitsInSubNode = false;
             for (uint8_t i = 0; i < 8u; ++i)
             {
-                if (_rNodes[i].contains(itemsize))
-                {
-                    itemFitsInSubNode = true;
-                    break;
-                }
-            }
+                if (!_rNodes[i].contains(it->first))
+                    continue;
 
-            // If the new item doesn't fit in any sub-node, try to move an existing item that does
-            if (!itemFitsInSubNode)
-            {
-                for (auto it = _pItems.begin(); it != _pItems.end(); ++it)
-                {
-                    for (uint8_t i = 0; i < 8u; ++i)
-                    {
-                        if (_rNodes[i].contains(it->first))
-                        {
-                            // Found an item that can fit in a sub-node
-                            auto itemToMove = *it;
-                            _pItems.erase(it);
+                // Found an item that can fit in a sub-node
+                auto itemToMove = *it;
+                _pItems.erase(it);
 
-                            if (!_nodes[i])
-                                _nodes[i] = std::make_unique<DynamicOctree<OBJ_TYPE>>(_rNodes[i], _CAPACITY, _DEPTH - 1);
+                if (!_nodes[i])
+                    _nodes[i] = std::make_unique<DynamicOctree<OBJ_TYPE>>(_rNodes[i], _CAPACITY, _DEPTH - 1);
 
-                            _nodes[i]->insert(itemToMove.second, itemToMove.first);
+                _nodes[i]->insert(itemToMove.second, itemToMove.first);
 
-                            // Now add the big item to current level
-                            _pItems.emplace_back(itemsize, item);
-                            return {&_pItems, std::prev(_pItems.end())};
-                        }
-                    }
-                }
+                // Now add the big item to current level
+                goto insert_here;
             }
         }
 
+    insert_here:
         _pItems.emplace_back(itemsize, item);
         return {&_pItems, std::prev(_pItems.end())};
     }
