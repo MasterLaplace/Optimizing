@@ -1,0 +1,207 @@
+have you ever been excited to play your
+
+favorite game only to have to wait
+
+through loading screen after loading
+
+screen I've spent the past 6 years
+
+creating a game engine and I'll show you
+
+how to remove all loading screens from
+
+your games we can do this today because
+
+computers are pretty Advanced years ago
+
+computers could only do one thing at a
+
+time so each feature a game had like
+
+these three had to be done one after
+
+another and that's why loading screens
+
+exist when you enter a new level the
+
+game has to stop what it's doing and
+
+load it this can take a while so the
+
+game shows you loading screen while you
+
+wait the computers have multiple threads
+
+now which means they can run different
+
+things at the same time this means you
+
+can continue playing on the main thread
+
+while the next level loads on background
+
+threads but it's very likely this will
+
+crash your game because if two threads
+
+read the same piece of memory they might
+
+get completely different values this
+
+happens when a thread accesses the same
+
+piece of memory over and over again
+
+because that data gets stored in the cas
+
+as well it's much faster to read from
+
+the C than from Ram so it's a huge
+
+optimization boost but if the the main
+
+thread writes a new value to Ram the
+
+other thread will be working with
+
+outdated data and the rules that control
+
+when data is copied from Ram to the
+
+cache are so obscure that you can't
+
+predict it this is the problem of C
+
+coherency and there are two ways we can
+
+solve it let's say we have a list of
+
+5,000 particles that we update on a
+
+background thread because the background
+
+thread is using this particle data often
+
+its location gets stored in its case but
+
+the main thread might want to spawn more
+
+particles so it allocates a new larger
+
+array the old memory is read and used by
+
+something else but the background thread
+
+doesn't know this yet it'll keep riding
+
+particle data to the same memory and
+
+this will definitely cause a crash to
+
+fix this we need to make sure two
+
+threads never use the same memory at the
+
+same time we'll use the example of a
+
+background thread loading a texture the
+
+thread loads the texture from disc and
+
+stores it in Ram then after it's done it
+
+sets this Boolean to true the main
+
+thread then notices this Boolean is true
+
+and start sending the texture to the
+
+graphics card but when it's rendered
+
+half of it missing this happens because
+
+memory isn't guaranteed to sink between
+
+the case and RAM in order even though
+
+the background thread sets the Boolean
+
+after loading the texture the Boolean
+
+might be sent from the cache to Ram
+
+first the main thread then starts
+
+sending the texture to the graphics card
+
+before it's ready and that's why it
+
+looks corrupted so this Boolean is not a
+
+great solution we need a robust way to
+
+know when everything from a thread's
+
+case has been sent to RAM for this we'll
+
+use a memory fence this fence lets us
+
+know when all previous memory rights
+
+have been sent to RAM and every thread
+
+can see the dark we just wrote when the
+
+texture data is fully written to Ram the
+
+fence will signal true and the main
+
+thread can send the texture to the
+
+graphics card this sounds like a lot of
+
+work but C managers fences for us with
+
+its task feature tasks run on background
+
+threads and they automatically create a
+
+fence when they finish running the main
+
+thread then checks that is completed
+
+Boolean which returns true when the
+
+thread finishes running and its Fen is
+
+signal let's move away from this code
+
+and look at a real demo I've created
+
+this forest scene that has terrain
+
+textures and model
+
+when the game starts up none of this is
+
+loaded so we'll show a main menu screen
+
+instead when the player clicks play
+
+we'll use tasks to load each of these
+
+from disk each frame the main thread
+
+checks these tasks and sends their data
+
+to the graphics card when they're done
+
+you can run this demo yourself details
+
+are in the video description but the
+
+game will stutter whenever it sends data
+
+to the graphics card and this video on
+
+screen shows you how to stop that from

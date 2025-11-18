@@ -1,0 +1,477 @@
+have you ever been excited to play a
+
+game only to be disappointed when it
+
+lags and
+
+stutters I've spent the past 6 years
+
+creating a game engine and I've been
+
+shocked at the things that can make or
+
+break performance I'll show three simple
+
+optimizations that you can use to make
+
+your game run up to 10 times quicker and
+
+rather than just talking about it we're
+
+going to optimize something you'll see
+
+in nearly every game terrain my current
+
+setup Rend is at 50 FPS and I'll show
+
+you how I increased it up to 400 using
+
+the first optimization this optimization
+
+is all about triangles you can make any
+
+kind of object out of them and it's
+
+likely every game you've played is
+
+really just a bunch of triangles moving
+
+around I've colored the model like this
+
+so you can see each triangle triangles
+
+can contain any kind of data you want
+
+but storing a lot of data will hurt
+
+performance more than you might think
+
+you don't need to sacrifice rendering
+
+quality for Speed but reducing memory
+
+usage will almost always guarantee
+
+faster rendering to show you what I mean
+
+let's look at how our terrain is
+
+rendered it's composed of smaller meshes
+
+and each mesh contains 128 triangles
+
+each triangle contains three vertices
+
+which contain position normal and UV
+
+vectors this adds up to 12 kiloby per
+
+mesh and 192 mbes for the entire scene
+
+we want to reduce this as much as we can
+
+the first thing we'll do is get rid of
+
+the UV coordinates these coordinates
+
+range from 0 to 1 and our position data
+
+ranges from 0 to 8 this means we can
+
+divide the position by eight and use
+
+that to sample textures
+
+instead with UVS gone that brings each
+
+mesh down to 9 Koby and our terrain is
+
+now rendering at 75
+
+FPS the next step is to get rid of some
+
+position data if we look at the terrain
+
+from above all the meshes look the same
+
+the only difference between them is
+
+their height so why do we need to store
+
+the same X and Zed positions in each one
+
+what we can do instead is generate the
+
+positions in the vertex Shader at
+
+runtime to do this we use a special
+
+variable called GL vertex ID this ID
+
+starts at zero for the first vertex then
+
+increments for each vertex after that
+
+these vertices follow a pattern first
+
+moving down and then up and to the right
+
+since this pattern repeats we can
+
+recreate it in the Shader using floor
+
+and mod functions there's a bit more to
+
+the Shader that I won't get into now as
+
+my plant Generation video already covers
+
+it in detail the important thing is that
+
+we no longer need to store the X and Zed
+
+positions in every mesh this boosts our
+
+FPS up to 130 and the last thing we can
+
+get rid of is the normals currently
+
+normals are stored as a 3D Vector but
+
+since they only represent a Direction
+
+they can be converted to pitch and your
+
+angles this means we only need to store
+
+two floats but we can compress them even
+
+further into 16bit integers this means
+
+they have half the Precision but that's
+
+still plenty for these angles this
+
+reduces each mesh down to 3 kiloby and
+
+it's the smallest that we can make them
+
+without losing more Precision but
+
+there's one more way to reduce memory
+
+usage and make this run twice as fast
+
+currently this this mesh is made out of
+
+individual triangles meaning we need to
+
+provide three vertices for each of them
+
+we can also use triangle strips which
+
+work a bit differently we still need to
+
+provide three vertices for the first
+
+triangle but every vertex after that
+
+builds a new triangle off the last both
+
+examples here use 12 vertices but the
+
+strip produces six more triangles if we
+
+change our mesh to use eight strips one
+
+for each row it reduces the amount of
+
+vertices we need down to 160 this brings
+
+us down to 20 MB for the full scene
+
+which is nearly 10 times less than what
+
+we started with our terrain is now
+
+rendering eight times faster and there's
+
+two reasons for that first the memory
+
+bandwidth was the bottleneck in the
+
+initial approach our shaders would
+
+execute very quickly then wait around
+
+for more data to be read from memory but
+
+by reducing our memory usage our shaders
+
+can run constantly the second reason is
+
+the vertex Shader runs fewer times since
+
+we change from Individual triangles to
+
+strips there are 2 and 1 half times less
+
+vertices to process
+
+now we can make this run even faster
+
+using the second optimization trick that
+
+I call batching this is not unique to
+
+terrain and it's not the same as
+
+instancing I'll explain it using ice
+
+cream imagine you walk into an ice cream
+
+shop with your 12 friends and you ask
+
+for an ice cream then you ask for
+
+another ice cream and another ice cream
+
+I know that I want 12 ice creams but
+
+this ice cream dude has no idea the ice
+
+cream dude is our GPU and each ice cream
+
+is a mesh that we want to draw this is
+
+pain painfully slow but gpus are pretty
+
+quick so drawing 12 meses one at a time
+
+is all right but if you try to render
+
+100,000 of them this way your GPU will
+
+explode the solution is to write our 12
+
+ice creams on a list and then hand it to
+
+the ice cream dude he then hands us 12
+
+ice creams and the important thing here
+
+is that we only over talk to him once
+
+but in return He gave us multiple things
+
+to do this in our games we give the GPU
+
+a list of all of our meshes and ask it
+
+to draw all of them but we also need to
+
+tell the GPU where we want each mesh to
+
+be drawn we can do this using a Shader
+
+storage buffer object which is an array
+
+in the Shader that stores the positions
+
+of all of our meshes we can select the
+
+right position for each mesh using
+
+another inbuilt variable called GL draw
+
+ID this ID is similar to GL vertex ID
+
+but it's Unique per mesh rather than per
+
+vertex we now have an efficient way of
+
+rendering multiple meshes using only one
+
+draw call so let's compare FPS with and
+
+without
+
+batching so why is the FPS stayed the
+
+same to find out let's have a look at
+
+two more metrics the difference here is
+
+a CPU time in the old approach the CPU
+
+spends more time sending commands to the
+
+GPU to draw every single mesh but when
+
+we use batching the CPU only has to send
+
+one command the reason the FPS is the
+
+same is because the GPU is the
+
+bottleneck in both scenarios but now the
+
+CPU is free to run other code next we'll
+
+render more terrain why is this so slow
+
+we're only rendering a billion triangles
+
+I think I see the problem this is where
+
+the third optimization trick is useful
+
+because it reduces the amount of
+
+triangles in this scene having a lot of
+
+triangles is great for detailed terrain
+
+but if the play is standing here that
+
+mountain in the distance will look the
+
+same if it has a thousand or a million
+
+triangles our goal is to use less
+
+triangles for distant terrain without
+
+the player noticing currently we're
+
+rendering small meshes all the way out
+
+into the distance so first we'll set a
+
+cap on this and this is what we'll call
+
+our first level of detail then we'll
+
+render the terrain again but with each
+
+mesh scaled up twice as big this is our
+
+second level of detail if we repeat this
+
+four times our terrain will be a kilm
+
+wide and only use 160,000 triangles if
+
+we try doing this using only one level
+
+of detail we'd have to use 8.3 million
+
+triangles the best part about this is
+
+that each level of detail uses the same
+
+amount of triangles and takes the same
+
+amount of time to render but when we try
+
+this in the 3D View you something
+
+strange occurs watch what happens when
+
+more levels are
+
+rendered since each level is rended in
+
+the same position the lower quality
+
+distant terrain is covering up the high
+
+quality close-up terrain if we have a
+
+look at a cross-section you can see the
+
+first level of detail in the middle and
+
+the other levels extending out to the
+
+sides there are some places where the
+
+larger level of detail cuts across the
+
+smaller level which hides our
+
+highquality terrain to fix this most
+
+games will fade out lowquality objects
+
+the closer they are but transparency is
+
+expensive on large objects like
+
+terrain what we'll do instead is syn the
+
+terrain that's close to the player as
+
+the player moves around new high quality
+
+terrain is generated underground and
+
+then Rises to the
+
+surface as a final optimization we'll
+
+skip rendering the meshes that are
+
+completely
+
+underground let's go back to our 3D View
+
+and apply sinking now we can see the
+
+close-up high quality terrain to show
+
+you how big our terrain is now I'll
+
+highlight each level of detail and zoom
+
+out since the largest level of detail
+
+sinks it feels like we're looking at a
+
+planet now I can't compare FPS with the
+
+last approach because I don't have
+
+enough memory to render it without
+
+multiple levels of detail but I can show
+
+the difference in size this is the
+
+entire terrain that we're rendering now
+
+and this is the terrain we're rendering
+
+at the start can you see it I'll zoom
+
+in this tiny blue area was rendering at
+
+50 FPS but now we're rendering 16,000
+
+times more terrain at five times the
+
+FPS as a final step we should disguise
+
+where each level of detail begins using
+
+foliage as the camera moves around you
+
+can see where the new high quality
+
+terrain Rises up we'll need a lot of
+
+foliage to cover it up and this video on
+
+screen will show you how to render
+
+highly optimized
