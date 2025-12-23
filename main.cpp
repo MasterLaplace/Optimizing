@@ -7,7 +7,7 @@
 
 int main()
 {
-    sf::RenderWindow window(sf::VideoMode(800, 600), "World Partition - Octree", sf::Style::Close);
+    sf::RenderWindow window(sf::VideoMode(sf::Vector2u{800, 600}), "World Partition - Octree", sf::Style::Close);
     window.setFramerateLimit(60);
 
 #ifndef RAYTRACING
@@ -53,26 +53,30 @@ int main()
     sf::Clock clock;
     while (window.isOpen())
     {
-        sf::Event event;
-        while (window.pollEvent(event))
+        // SFML 3: pollEvent returns std::optional<sf::Event>
+        while (auto event = window.pollEvent())
         {
-            if (event.type == sf::Event::Closed || sf::Keyboard::isKeyPressed(sf::Keyboard::Escape))
+            // Close when window closed or Escape pressed as an event
+            if (event->is<sf::Event::Closed>() ||
+                (event->is<sf::Event::KeyPressed>() && event->getIf<sf::Event::KeyPressed>()->code == sf::Keyboard::Key::Escape))
+            {
                 window.close();
+            }
         }
 
         float deltaTime = clock.restart().asSeconds();
 
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Right))
-            player_rect.move(500 * deltaTime, 0);
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Left))
-            player_rect.move(-500 * deltaTime, 0);
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Up))
-            player_rect.move(0, -500 * deltaTime);
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Down))
-            player_rect.move(0, 500 * deltaTime);
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Z))
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Right))
+            player_rect.move(sf::Vector2f{500.0f * deltaTime, 0.0f});
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Left))
+            player_rect.move(sf::Vector2f{-500.0f * deltaTime, 0.0f});
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Up))
+            player_rect.move(sf::Vector2f{0.0f, -500.0f * deltaTime});
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Down))
+            player_rect.move(sf::Vector2f{0.0f, 500.0f * deltaTime});
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Z))
             player_height += 50 * deltaTime;
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::S))
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S))
             player_height -= 50 * deltaTime;
 
         player_height = std::clamp(player_height, 0.0f, size.y);

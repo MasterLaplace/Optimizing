@@ -1,0 +1,271 @@
+have you ever played a game that freezes
+
+every now and then this isn't because
+
+your PC isn't fast enough and it can
+
+even happen if the game is optimized
+
+I've spent the past 6 years creating a
+
+game engine and I'll show you how to
+
+stop your games from freezing and how
+
+much faster they can run when they don't
+
+there's two pieces to this puzzle and
+
+the first is best explained using
+
+Burgers let's say you order a burger at
+
+a restaurant and then you stand there
+
+waiting and waiting and eventually your
+
+Burger's ready and then you walk away
+
+and eat it but you held up the fine the
+
+other customers haven't ordered yet and
+
+their burgers could have cooked at the
+
+same time the same problem happens to
+
+games let's say we have a game that
+
+renders a blocky voxal world this
+
+function runs constantly and renders a
+
+mesh onto your screen there are no
+
+issues until you place a new block a new
+
+mesh has to be sent to the graphics card
+
+and this is where the line gets held up
+
+just before the new block appeared the
+
+whole screen froze this is because we
+
+start sending the new mesh to the
+
+graphics card then try to render it
+
+straight away
+
+it's like ordering a burger and trying
+
+to eat it before it's cooked the chef
+
+isn't ready and neither is the graphics
+
+card this changed how I thought games
+
+worked before I looked at this code and
+
+thought since the transfer mesh call
+
+runs instantly doesn't that mean that
+
+the transfer is done but it's not we've
+
+only submitted our order so how do we
+
+know when our Burger's ready some pubs
+
+will give you a device when you order
+
+your food it has a flashing red light on
+
+it and it changes to Green when your
+
+Burger's ready so first We'll order a
+
+burger and and then get a device then
+
+we'll relax and have a drink until the
+
+device flashes Green in computer land
+
+this device is called a fence and it
+
+lets us know when an operation is
+
+complete before we were doing the
+
+equivalent of this it's clear this will
+
+freeze the game when we can see this
+
+while loop but it's hard to know what
+
+can cause a freeze when there's
+
+underlying asynchronous things happening
+
+in the background to stop games from
+
+freezing we'll need two meshes and a
+
+fence let's call the meshes A and B and
+
+render one of them at a time on the
+
+right the monitor has mesh a inside it
+
+and mesh B is sitting below it looking
+
+pretty the value of render a controls
+
+which mesh is rendered when we place a
+
+block we don't have to update both
+
+meshes just the one that's not being
+
+rendered and in this case it's mesh B we
+
+can update mesh b as much as we like and
+
+the game will run smoothly because we're
+
+not rendering it but if we try to render
+
+mesh B too early the game will freeze
+
+until the transfer completes so let's
+
+create a fence after we start the
+
+transfer when the fence signal we know
+
+the transfer is done and we can render
+
+MB the only downside is it takes a few
+
+frames for this transfer to complete but
+
+most games you've played have this delay
+
+and you've never noticed but we've
+
+solved the first piece of the puzzle and
+
+it won't freeze again but it still won't
+
+render smoothly I'll play it frame by
+
+frame so you can see what I mean each
+
+mesh is rendered twice in a row this
+
+means the camera is moving around at 60
+
+Fram per second but the mesh is only
+
+updating at half that it's like a pub
+
+with only two fry P if two burgers are
+
+cooking and a third customer arrives
+
+they'll have to wait the kitchen runs at
+
+full capacity it's just not accepting
+
+any new orders likewise the game runs
+
+smoothly but it's not always showing a
+
+new mesh there are two ways we can solve
+
+this the first is to have 50 pans but
+
+that's a waste because most of them will
+
+never be used the second solution is
+
+more efficient but we need to clean up
+
+our code first let's make a new mesh
+
+class that handles updating and
+
+rendering a mesh this class has two
+
+fences so we can know if a mesh is
+
+transferring or rendering our two meshes
+
+that used to be called A and B are now
+
+stored in this array when we place a
+
+block we need to check which mesh we can
+
+update this is like the chef checking
+
+which pan is empty before cooking more
+
+meat to do this we'll Loop over the
+
+array then check if each mesh is
+
+updating or rendering if not we can
+
+update it without causing a freeze then
+
+the array is sorted so the most
+
+upto-date mesh is at the start since the
+
+array is sorted we can render the first
+
+mesh that's ready now let's try using
+
+three meshes it's better but sometimes
+
+the mesh is still rendered twice in a
+
+row we don't always know how many meshes
+
+we need we could just allocate 50 of
+
+them but that would be a waste of memory
+
+instead we'll change our array to a list
+
+and if all meshes are in use we'll
+
+create a new one we're now rendering a
+
+new mesh every single frame in this case
+
+we needed four meshes which means the
+
+first Burger finished cooking before the
+
+fifth customer arrived this is now
+
+running at 15,000 frames per second
+
+while continuously Streaming new data to
+
+the graphics card you can run these
+
+demos yourself and experiment with the
+
+code details are in the video
+
+description this is just one of many
+
+optimization tricks and this video on
+
+screen has three more that you can apply
+
+to any game
